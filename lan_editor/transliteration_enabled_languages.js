@@ -1,0 +1,26 @@
+// transliteration_enabled_languages.js
+window.transliterableLanguages = [
+  { "id": "1", "language": "English", "code": "en" },
+  { "id": "2", "language": "Amharic", "code": "am" },
+  { "id": "3", "language": "Arabic", "code": "ar" },
+  { "id": "4", "language": "Bengali", "code": "bn" },
+  { "id": "5", "language": "Chinese", "code": "zh" },
+  { "id": "6", "language": "Greek", "code": "el" },
+  { "id": "7", "language": "Gujarati", "code": "gu" },
+  { "id": "8", "language": "Hindi", "code": "hi" },
+  { "id": "9", "language": "Kannada", "code": "kn" },
+  { "id": "10", "language": "Malayalam", "code": "ml" },
+  { "id": "11", "language": "Marathi", "code": "mr" },
+  { "id": "12", "language": "Nepali", "code": "ne" },
+  { "id": "13", "language": "Oriya", "code": "or" },
+  { "id": "14", "language": "Persian", "code": "fa" },
+  { "id": "15", "language": "Punjabi", "code": "pa" },
+  { "id": "16", "language": "Russian", "code": "ru" },
+  { "id": "17", "language": "Sanskrit", "code": "sa" },
+  { "id": "18", "language": "Sinhalese", "code": "si" },
+  { "id": "19", "language": "Serbian", "code": "sr" },
+  { "id": "20", "language": "Tamil", "code": "ta" },
+  { "id": "21", "language": "Telugu", "code": "te" },
+  { "id": "22", "language": "Tigrinya", "code": "ti" },
+  { "id": "23", "language": "Urdu", "code": "ur" }
+];

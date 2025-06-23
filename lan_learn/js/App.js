@@ -1,0 +1,306 @@
+// Main Application JavaScript
+class GTongueLearnApp {
+    constructor() {
+        this.currentPage = 'home';
+        this.translationService = null;
+        this.init();
+    }
+
+    init() {
+        this.setupTranslationService();
+        this.setupNavigation();
+        this.setupLanguageSelector();
+        this.showPage('home');
+        this.initializeLucideIcons();
+        console.log('GTongue Learn App initialized');
+    }
+
+    setupTranslationService() {
+        if (typeof TranslationService !== 'undefined') {
+            this.translationService = new TranslationService();
+            
+            // Load saved language preference
+            this.translationService.loadLanguagePreference();
+            
+            // Populate language dropdown
+            this.populateLanguageDropdown();
+        }
+    }
+
+    populateLanguageDropdown() {
+        const languageSelect = document.getElementById('language-select');
+        if (!languageSelect || !this.translationService) return;
+
+        const languages = this.translationService.getSupportedLanguages();
+        
+        // Clear existing options
+        languageSelect.innerHTML = '';
+        
+        // Add language options
+        Object.entries(languages).forEach(([code, name]) => {
+            const option = document.createElement('option');
+            option.value = code;
+            option.textContent = `🌐 ${name}`;
+            option.className = 'notranslate';
+            languageSelect.appendChild(option);
+        });
+
+        // Set current language (default to English)
+        const currentLang = this.translationService.getCurrentLanguage() || 'en';
+        languageSelect.value = currentLang;
+    }
+
+    setupLanguageSelector() {
+        const languageSelect = document.getElementById('language-select');
+        if (!languageSelect) return;
+
+        let isChangingLanguage = false;
+
+        languageSelect.addEventListener('change', (e) => {
+            // Prevent multiple rapid changes
+            if (isChangingLanguage) {
+                e.preventDefault();
+                return;
+            }
+
+            const selectedLanguage = e.target.value;
+            const currentLanguage = this.translationService?.getCurrentLanguage() || 'en';
+            
+            // Don't change if it's the same language
+            if (selectedLanguage === currentLanguage) {
+                return;
+            }
+
+            if (this.translationService) {
+                isChangingLanguage = true;
+                
+                // Disable the selector while changing
+                languageSelect.disabled = true;
+                languageSelect.style.opacity = '0.6';
+                
+                const languageName = this.translationService.getSupportedLanguages()[selectedLanguage];
+                Utils.showToast(`Changing language to ${languageName}...`, 'info');
+                
+                try {
+                    this.translationService.setCurrentLanguage(selectedLanguage);
+                    
+                    // Re-enable after a shorter delay
+                    setTimeout(() => {
+                        isChangingLanguage = false;
+                        languageSelect.disabled = false;
+                        languageSelect.style.opacity = '1';
+                    }, 1000);
+                    
+                } catch (error) {
+                    console.error('Language change error:', error);
+                    Utils.showToast('Failed to change language. Please try again.', 'error');
+                    
+                    // Reset selector
+                    languageSelect.value = currentLanguage;
+                    isChangingLanguage = false;
+                    languageSelect.disabled = false;
+                    languageSelect.style.opacity = '1';
+                }
+            }
+        });
+
+        // Handle page visibility change to reset state
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && isChangingLanguage) {
+                // Reset state when page becomes visible again
+                setTimeout(() => {
+                    isChangingLanguage = false;
+                    languageSelect.disabled = false;
+                    languageSelect.style.opacity = '1';
+                }, 1000);
+            }
+        });
+    }
+
+    setupNavigation() {
+        const navLinks = document.querySelectorAll('.nav-link');
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const href = link.getAttribute('href');
+                const page = href.substring(1); // Remove the # from href
+                this.showPage(page);
+                this.updateActiveNavLink(link);
+            });
+        });
+
+        // Handle go back buttons
+        document.getElementById('go-back-btn')?.addEventListener('click', () => {
+            this.showPage('home');
+        });
+
+        document.getElementById('about-back-btn')?.addEventListener('click', () => {
+            this.showPage('dialogue');
+        });
+
+        document.getElementById('about-btn')?.addEventListener('click', () => {
+            this.showPage('about');
+        });
+    }
+
+    showPage(pageId) {
+        // Hide all pages
+        const pages = document.querySelectorAll('.page');
+        pages.forEach(page => page.classList.remove('active'));
+
+        // Show the selected page
+        const targetPage = document.getElementById(`${pageId}-page`);
+        if (targetPage) {
+            targetPage.classList.add('active');
+            this.currentPage = pageId;
+        }
+
+        // Update navigation
+        this.updateNavigation(pageId);
+    }
+
+    updateActiveNavLink(activeLink) {
+        const navLinks = document.querySelectorAll('.nav-link');
+        navLinks.forEach(link => link.classList.remove('active'));
+        activeLink.classList.add('active');
+    }
+
+    updateNavigation(pageId) {
+        const navLinks = document.querySelectorAll('.nav-link');
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('href') === `#${pageId}`) {
+                link.classList.add('active');
+            }
+        });
+    }
+
+    initializeLucideIcons() {
+        // Initialize Lucide icons when they're available
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        } else {
+            // Retry after a short delay if lucide is not loaded yet
+            setTimeout(() => this.initializeLucideIcons(), 100);
+        }
+    }
+}
+
+// Utility Functions
+const Utils = {
+    // Show toast notification
+    showToast(message, type = 'info') {
+        const toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+
+        toastContainer.appendChild(toast);
+
+        // Trigger animation
+        setTimeout(() => toast.classList.add('show'), 10);
+
+        // Remove toast after 3 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+    },
+
+    // Show popup
+    showPopup(popupId) {
+        const popup = document.getElementById(popupId);
+        if (popup) {
+            popup.classList.add('show');
+        }
+    },
+
+    // Hide popup
+    hidePopup(popupId) {
+        const popup = document.getElementById(popupId);
+        if (popup) {
+            popup.classList.remove('show');
+        }
+    },
+
+    // Generate unique ID
+    generateId() {
+        return Date.now() + Math.random().toString(36).substr(2, 9);
+    },
+
+    // Validate input
+    validateInput(value, type = 'text') {
+        if (!value || value.trim() === '') {
+            return false;
+        }
+        
+        switch (type) {
+            case 'name':
+                return value.trim().length >= 2 && /^[a-zA-Z\s]+$/.test(value.trim());
+            default:
+                return value.trim().length > 0;
+        }
+    },
+
+    // Format name
+    formatName(name) {
+        return name.trim().split(' ').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+    },
+
+    // Local storage helpers
+    getFromStorage(key, defaultValue = null) {
+        try {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : defaultValue;
+        } catch (error) {
+            console.error('Error reading from localStorage:', error);
+            return defaultValue;
+        }
+    },
+
+    saveToStorage(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (error) {
+            console.error('Error saving to localStorage:', error);
+        }
+    },
+
+    removeFromStorage(key) {
+        try {
+            localStorage.removeItem(key);
+        } catch (error) {
+            console.error('Error removing from localStorage:', error);
+        }
+    }
+};
+
+// Global app instance
+let app;
+
+// Initialize the application when the DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    app = new GTongueLearnApp();
+    
+    // Initialize other modules
+    if (typeof LearnHome !== 'undefined') {
+        window.learnHome = new LearnHome();
+    }
+    
+    if (typeof DialoguePage !== 'undefined') {
+        window.dialoguePage = new DialoguePage();
+    }
+});
+
+// Export for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { GTongueLearnApp, Utils };
+} 
