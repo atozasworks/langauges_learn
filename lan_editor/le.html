@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Type in Any Language | AtoZ Services</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(120deg, #e0eafc 0%, #cfdef3 100%);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .hero-bg {
+      position: relative;
+      background: linear-gradient(135deg, #f9ea8f 0%, #fbc2eb 100%);
+      padding: 64px 0 36px 0;
+      text-align: center;
+      overflow: hidden;
+    }
+    .hero-svg-bg {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .hero-content {
+      position: relative;
+      z-index: 1;
+    }
+    .logo-circle {
+      background: #fff;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 90px;
+      height: 90px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.09);
+      margin-bottom: 10px;
+      animation: bounce 1.6s infinite alternate;
+    }
+    .logo-svg {
+      width: 54px;
+      height: 54px;
+      display: block;
+    }
+    @keyframes bounce {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-10px); }
+    }
+    .brand {
+      color: #d2691e;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .tagline {
+      font-size: 1.18rem;
+      color: #333;
+      margin: 0 auto 16px auto;
+      max-width: 600px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 700px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.09);
+      padding: 36px 32px 32px 32px;
+      opacity: 0;
+      transform: translateY(30px);
+      animation: fadeInUp 0.7s 0.3s forwards;
+    }
+    @keyframes fadeInUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .section-title {
+      font-size: 1.25rem;
+      color: #1a237e;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    ul, ol {
+      margin: 0 0 0 22px;
+    }
+    .tutorial-list li {
+      margin-bottom: 12px;
+      padding-left: 8px;
+      position: relative;
+      opacity: 0;
+      transform: translateX(-30px);
+      animation: revealStep 0.6s forwards;
+    }
+    .tutorial-list li:nth-child(1) { animation-delay: 0.3s; }
+    .tutorial-list li:nth-child(2) { animation-delay: 0.45s; }
+    .tutorial-list li:nth-child(3) { animation-delay: 0.6s; }
+    .tutorial-list li:nth-child(4) { animation-delay: 0.75s; }
+    .tutorial-list li:nth-child(5) { animation-delay: 0.9s; }
+    @keyframes revealStep {
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .tutorial-list li:before {
+      content: '\2714';
+      color: #d2691e;
+      font-size: 1.1em;
+      position: absolute;
+      left: -22px;
+      top: 0;
+    }
+    .back-btn {
+      display: inline-block;
+      margin-bottom: 18px;
+      background: linear-gradient(90deg, #f9ea8f 0%, #fbc2eb 100%);
+      color: #d2691e;
+      padding: 8px 22px;
+      border-radius: 20px;
+      font-weight: 600;
+      text-decoration: none;
+      font-size: 1rem;
+      transition: background 0.2s, color 0.2s, transform 0.16s;
+    }
+    .back-btn:hover {
+      background: linear-gradient(90deg, #fbc2eb 0%, #f9ea8f 100%);
+      color: #0d1339;
+      transform: scale(1.07);
+    }
+    .footer {
+      text-align: center;
+      padding: 18px 0 8px 0;
+      color: #888;
+      font-size: 0.98rem;
+      margin-top: 48px;
+      background: linear-gradient(90deg, #e0eafc 0%, #cfdef3 100%);
+      animation: fadeInFooter 1.6s 0.6s both;
+    }
+    @keyframes fadeInFooter {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  
+     
+  </style>
+  <link rel="stylesheet" href="style.css">
+  <script src="jsapi.js"></script>
+  <script src="transliterationI.js"></script>
+</head>
+<body>
+  <!-- Landing Hero Section -->
+  <div id="landing-hero" class="hero-bg">
+    <div class="hero-svg-bg">
+      <!-- Decorative SVG background for a modern look -->
+      <svg width="100%" height="100%" viewBox="0 0 1440 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#fbc2eb" fill-opacity="0.4" d="M0,160L80,144C160,128,320,96,480,112C640,128,800,192,960,197.3C1120,203,1280,149,1360,122.7L1440,96L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"></path>
+      </svg>
+    </div>
+    <div class="hero-content">
+      <div class="logo-circle">
+        <span style="font-size:2.5rem; color:#e7a23d; font-weight:bold;">A-Z</span>
+      </div>
+      <h1 style="margin-top: 18px; font-size: 2.7rem; color: #333;">Language Editor Suite</h1>
+      <p style="font-size: 1.3rem; color: #e7a23d; margin-bottom: 10px;">Write in Any Language, Express in Every Script</p>
+      <p style="font-size: 1.08rem; color: #555; max-width: 600px; margin: 0 auto;">
+        Welcome to the <b>Language Editor Suite</b> by AtoZ Services—a powerful, browser-based toolkit for typing, editing, and transliterating text in dozens of world languages and scripts. Empower your communication, documentation, and creativity with seamless language technology.
+      </p>
+      <div style="margin-top: 32px;">
+        <a id="launch-editor-btn" href="#" class="cta-btn">Launch Editor</a>
+      </div>
+    </div>
+  </div>
+  <!-- Main Editor UI (hidden by default) -->
+  <div id="editor-ui" style="display:none;">
+
+
+  <style>
+    .cta-btn {
+      background: linear-gradient(90deg, #f7971e 0%, #ffd200 100%);
+      color: #fff;
+      padding: 14px 36px;
+      border-radius: 32px;
+      font-size: 1.15rem;
+      text-decoration: none;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(231, 162, 61, 0.09);
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .cta-btn:hover {
+      background: linear-gradient(90deg, #ffd200 0%, #f7971e 100%);
+      box-shadow: 0 4px 24px rgba(231, 162, 61, 0.12);
+    }
+    .features-section {
+      background: #fff;
+      padding: 48px 0 32px 0;
+      text-align: center;
+    }
+    .features-container {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .features-list {
+      list-style: none;
+      padding: 0;
+      margin: 24px 0 0 0;
+      text-align: left;
+      display: inline-block;
+    }
+    .features-list li {
+      font-size: 1.09rem;
+      color: #444;
+      margin-bottom: 12px;
+      padding-left: 1.2em;
+      position: relative;
+    }
+    .features-list li::before {
+      content: '\2713';
+      color: #e7a23d;
+      position: absolute;
+      left: 0;
+    }
+    .subpages-section {
+      background: #f6f9fb;
+      padding: 44px 0 32px 0;
+    }
+    .subpages-container {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .subpage-card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(231, 162, 61, 0.06);
+      padding: 26px 36px;
+      margin-bottom: 12px;
+    }
+    .subpage-card h3 {
+      margin-bottom: 8px;
+      color: #e7a23d;
+    }
+    .footer {
+      background: #e7a23d;
+      color: #fff;
+      padding: 20px 0;
+      text-align: center;
+    }
+    .footer-content {
+      font-size: 1.01rem;
+      letter-spacing: 0.02em;
+    }
+    @media (max-width: 700px) {
+      .features-list, .features-container, .subpages-container, .subpage-card {
+        width: 95vw;
+        padding-left: 0;
+        padding-right: 0;
+      }
+      .subpage-card {
+        padding: 18px 10px;
+      }
+    }
+  </style>
+
+      <div id="dropdown-root"></div>
+        <select id="languageSelector" style="display:none;"></select>
+      <div class="toolbar">
+        <label>Document Name: </label>
+        <input type="text" id="fileName" value="Untitled Document" placeholder="Enter document name" />
+        <label>Page Size: </label>
+        <select id="pageSizeSelector"></select>
+        <label>Orientation: </label>
+        <select id="orientationSelector">
+          <option value="portrait">Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+        <label>Font Size: </label>
+        <select id="fontSizeSelector">
+          <option value="12px">12px</option>
+          <option value="14px">14px</option>
+          <option value="16px">16px</option>
+          <option value="18px">18px</option>
+          <option value="20px">20px</option>
+          <option value="24px">24px</option>
+          <option value="28px">28px</option>
+          <option value="32px">32px</option>
+          <option value="36px">36px</option>
+          <option value="40px">40px</option>
+        </select>
+        
+        <button id="saveBtn" class="icon-button" title="Save Document">Save</button>
+        <button id="printBtn" class="icon-button" title="Print Document">Print</button>
+
+        <div class="text-toolbar">
+          <select id="fontFamilySelector" class="ql-font"></select>
+          <select id="textStyleSelector" class="ql-header">
+            <option value="" selected>Normal</option>
+            <option value="1">Header 1</option>
+            <option value="2">Header 2</option>
+            <option value="3">Header 3</option>
+            <option value="4">Header 4</option>
+            <option value="5">Header 5</option>
+            <option value="6">Header 6</option>
+          </select>
+          <span class="ql-formats">
+            <button class="ql-bold" title="Bold"></button>
+            <button class="ql-italic" title="Italic"></button>
+            <button class="ql-underline" title="Underline"></button>
+            <button class="ql-strike" title="Strikethrough"></button>
+            <button class="ql-link" title="Link"></button>
+            <button class="ql-image" title="Image"></button>
+            <button class="ql-script" value="sub" title="Subscript"></button>
+            <button class="ql-script" value="super" title="Superscript"></button>
+          </span>
+          <input type="file" id="imageUploadInput" accept="image/*" style="display:none;">
+          <span class="ql-formats">
+            <button class="ql-list" value="ordered" title="Ordered List"></button>
+            <button class="ql-list" value="bullet" title="Unordered List"></button>
+            <button class="ql-list" value="check" title="Checklist"></button>
+            <button class="ql-indent" value="-1" title="Decrease Indent"></button>
+            <button class="ql-indent" value="+1" title="Increase Indent"></button>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-align" value="" title="Align Left"></button>
+            <button class="ql-align" value="center" title="Align Center"></button>
+            <button class="ql-align" value="right" title="Align Right"></button>
+            <button class="ql-align" value="justify" title="Align Justify"></button>
+          </span>
+          <span class="ql-formats">
+            <input type="color" class="ql-color" value="#000000" title="Text Color">
+            <button class="ql-clean" title="Clear Formatting"></button>
+          </span>
+        </div>
+      </div>
+      <div class="editor-container">
+      <div class="document-wrapper">
+        <div id="editor" contenteditable="true" class="ql-editor"></div>
+      </div>
+      </div>
+    </div>
+  </div>
+  <script src="languages.js"></script>
+  <script src="transliteration_enabled_languages.js"></script>
+  <script src="app.js"></script>
+  </div>
+  <script>
+    // Show editor UI and hide landing on button click
+    document.addEventListener('DOMContentLoaded', function() {
+      var btn = document.getElementById('launch-editor-btn');
+      if (btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          document.getElementById('landing-hero').style.display = 'none';
+          document.getElementById('editor-ui').style.display = '';
+        });
+      }
+    });
+  </script>
+</body>
+</html>

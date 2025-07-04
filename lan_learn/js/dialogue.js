@@ -203,48 +203,168 @@ class DialoguePage {
     shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
         }
-        return array;
-    }
-
-    splitIntoConversations(text) {
-        const lines = text.split('\n');
-        const conversations = [];
-        let currentConversation = '';
-
-        for (const line of lines) {
-            if (line.includes('Conversation ') && currentConversation.trim() !== '') {
-                conversations.push(currentConversation.trim());
-                currentConversation = '';
-            }
-            currentConversation += line + '\n';
-        }
-
-        if (currentConversation.trim() !== '') {
-            conversations.push(currentConversation.trim());
-        }
-
-        return conversations.filter(conv => conv.trim() !== '');
-    }
-
-    populateConversationSelector() {
-        const selector = document.getElementById('conversation-selector');
-        if (!selector) return;
-
-        selector.innerHTML = '';
         
-        this.modifiedDialogue.forEach((conversation, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = `Conversation ${index + 1}`;
-            selector.appendChild(option);
-        });
+        const dialogueText = getDialogueForLanguage(this.currentLanguage);
+        
+        if (!dialogueText || dialogueText.trim() === '') {
+            throw new Error(`No dialogue content found for language: ${this.currentLanguage}`);
+        }
+
+        this.originalDialogue = dialogueText;
+        
+        // Apply translation if needed
+        await this.applyTranslation();
+        
+        this.processDialogue();
+        this.populateConversationSelector();
+        this.setCurrentConversation(0);
+        
+    } catch (error) {
+        console.error('Error loading dialogue:', error);
+        this.showError(`Failed to load dialogue script for ${this.currentLanguage}. Available languages: ${getAvailableLanguages().join(', ')}`);
+        
+        // Navigate back to home after a delay
+        setTimeout(() => {
+            if (app) {
+                app.showPage('home');
+            }
+        }, 5000);
+    } finally {
+        this.setLoading(false);
+    }
+}
+
+async applyTranslation() {
+    if (window.app && window.app.translationService) {
+        const currentLang = window.app.translationService.getCurrentLanguage();
+        if (currentLang !== 'en') {
+            try {
+                // For Google Translate Widget, the translation happens automatically
+                // when the content is displayed. We just need to ensure the service is ready.
+                console.log(`Translation will be applied for language: ${currentLang}`);
+                
+                // Update language display
+                const currentLanguageElement = document.getElementById('current-language');
+                if (currentLanguageElement) {
+                    const langName = window.app.translationService.getSupportedLanguages()[currentLang] || 'English';
+                    currentLanguageElement.textContent = langName;
+                }
+            } catch (error) {
+                console.error('Translation setup failed:', error);
+            }
+        }
+    }
+}
+
+async refreshCurrentDialogue() {
+    // Store current state
+    const currentConversation = this.currentConversationIndex;
+    const currentLine = this.currentLineIndex;
+    
+    // Reload dialogue with current translation
+    await this.loadDialogue();
+    
+    // Restore state if possible
+    if (currentConversation >= 0 && currentConversation < this.modifiedDialogue.length) {
+        setTimeout(() => {
+            this.setCurrentConversation(currentConversation);
+            if (currentLine >= 0) {
+                this.currentLineIndex = currentLine;
+                this.displayConversation();
+            }
+        }, 500);
+    }
+}
+
+processDialogue() {
+    if (!this.originalDialogue || this.learnerNames.length === 0) {
+        return;
     }
 
-    setCurrentConversation(index) {
-        if (index < 0 || index >= this.modifiedDialogue.length) {
-            return;
+    // Replace speaker names with learner names
+    const modifiedText = this.replaceAllBeforeColonWithLearners(this.originalDialogue, this.learnerNames);
+    
+    // Split into conversations
+    this.modifiedDialogue = this.splitIntoConversations(modifiedText);
+}
+
+replaceAllBeforeColonWithLearners(text, learners) {
+    if (!text || !Array.isArray(learners) || learners.length === 0) {
+        return text;
+    }
+
+    const shuffledNames = this.shuffleArray([...learners]);
+    const recentlyUsedNames = [];
+    const minDistance = Math.min(3, learners.length - 1);
+
+    const getRandomName = () => {
+        return shuffledNames[Math.floor(Math.random() * shuffledNames.length)];
+    };
+
+    return text.replace(
+        /^(.+?)\s*:(.*)$/gm,
+        (match, beforeColon, afterColon) => {
+            let assignedName = null;
+            let attempts = 0;
+            const maxAttempts = learners.length * 2;
+
+            // Try to find a name that hasn't been recently used
+            while (attempts < maxAttempts) {
+                const candidate = getRandomName();
+                attempts++;
+
+                if (!recentlyUsedNames.includes(candidate)) {
+                    assignedName = candidate;
+                    break;
+                }
+            }
+
+            // Fallback logic
+            if (!assignedName) {
+                const fallbackPool = shuffledNames.filter(name => !recentlyUsedNames.includes(name));
+                assignedName = fallbackPool.length > 0 ? 
+                    fallbackPool[Math.floor(Math.random() * fallbackPool.length)] : 
+                    getRandomName();
+            }
+
+            recentlyUsedNames.push(assignedName);
+            if (recentlyUsedNames.length > minDistance) {
+                recentlyUsedNames.shift();
+            }
+
+            return `<span class="learner-name"><strong>${assignedName}</strong></span>:<span class="conversation-text">${afterColon}</span>`;
+        }
+    );
+}
+
+shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+splitIntoConversations(text) {
+    const lines = text.split('\n');
+    const conversations = [];
+    let currentConversation = '';
+    let lastTopic = '';
+    for (const line of lines) {
+        // Track the topic line
+        if (line.trim() && !line.includes('Conversation ') && line.trim() !== '' && !line.match(/^Person \d+:/)) {
+            lastTopic = line.trim();
+        }
+        if (line.includes('Conversation ') && currentConversation.trim() !== '') {
+            conversations.push(currentConversation.trim());
+            currentConversation = '';
+        }
+        // When we hit a Conversation line, append topic if available
+        if (line.includes('Conversation ') && lastTopic) {
+            currentConversation += `${line.trim()} (${lastTopic})\n`;
+        } else {
+            currentConversation += line + '\n';
         }
 
         this.currentConversationIndex = index;

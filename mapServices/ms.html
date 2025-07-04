@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Services | AtoZ Services</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(120deg, #e0eafc 0%, #cfdef3 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        .hero-bg {
+            position: relative;
+            background: linear-gradient(135deg, #b2fefa 0%, #e0ffea 100%);
+            padding: 64px 0 36px 0;
+            text-align: center;
+            overflow: hidden;
+        }
+        .hero-svg-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+        .logo-circle {
+            background: #fff;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 90px;
+            height: 90px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.09);
+            margin-bottom: 10px;
+            animation: bounce 1.6s infinite alternate;
+        }
+        .logo-svg {
+            width: 54px;
+            height: 54px;
+            display: block;
+        }
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+        .brand {
+            color: #1a8c6b;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .tagline {
+            font-size: 1.18rem;
+            color: #333;
+            margin: 0 auto 16px auto;
+            max-width: 600px;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 700px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.09);
+            padding: 36px 32px 32px 32px;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 0.7s 0.3s forwards;
+        }
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .section-title {
+            font-size: 1.25rem;
+            color: #1a237e;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        ul, ol {
+            margin: 0 0 0 22px;
+        }
+        .tutorial-list li {
+            margin-bottom: 12px;
+            padding-left: 8px;
+            position: relative;
+            opacity: 0;
+            transform: translateX(-30px);
+            animation: revealStep 0.6s forwards;
+        }
+        .tutorial-list li:nth-child(1) { animation-delay: 0.3s; }
+        .tutorial-list li:nth-child(2) { animation-delay: 0.45s; }
+        .tutorial-list li:nth-child(3) { animation-delay: 0.6s; }
+        .tutorial-list li:nth-child(4) { animation-delay: 0.75s; }
+        .tutorial-list li:nth-child(5) { animation-delay: 0.9s; }
+        @keyframes revealStep {
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .tutorial-list li:before {
+            content: '\2714';
+            color: #1a8c6b;
+            font-size: 1.1em;
+            position: absolute;
+            left: -22px;
+            top: 0;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 18px;
+            background: linear-gradient(90deg, #b2fefa 0%, #e0ffea 100%);
+            color: #1a8c6b;
+            padding: 8px 22px;
+            border-radius: 20px;
+            font-weight: 600;
+            text-decoration: none;
+            font-size: 1rem;
+            transition: background 0.2s, color 0.2s, transform 0.16s;
+        }
+        .back-btn:hover {
+            background: linear-gradient(90deg, #e0ffea 0%, #b2fefa 100%);
+            color: #0d1339;
+            transform: scale(1.07);
+        }
+        .footer {
+            text-align: center;
+            padding: 18px 0 8px 0;
+            color: #888;
+            font-size: 0.98rem;
+            margin-top: 48px;
+            background: linear-gradient(90deg, #e0eafc 0%, #cfdef3 100%);
+            animation: fadeInFooter 1.6s 0.6s both;
+        }
+        @keyframes fadeInFooter {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+    <link href="styles.css" rel="stylesheet">
+    <!-- MapLibre GL JS -->
+    <link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet" />
+</head>
+<body>
+    <!-- Landing Hero Section -->
+    <div id="landing-hero" class="hero-bg">
+        <div class="hero-svg-bg">
+            <svg width="100%" height="100%" viewBox="0 0 1440 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#b2fefa" fill-opacity="0.4" d="M0,160L80,144C160,128,320,96,480,112C640,128,800,192,960,197.3C1120,203,1280,149,1360,122.7L1440,96L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"></path>
+            </svg>
+        </div>
+        <div class="hero-content">
+            <div class="logo-circle">
+                <span style="font-size:2.5rem; color:#1fa2ff; font-weight:bold;">A-Z</span>
+            </div>
+            <h1 style="margin-top: 18px; font-size: 2.7rem; color: #333;">Map Services Suite</h1>
+            <p style="font-size: 1.3rem; color: #1fa2ff; margin-bottom: 10px;">Explore, Search, and Visualize the World</p>
+            <p style="font-size: 1.08rem; color: #555; max-width: 600px; margin: 0 auto;">
+                Welcome to the <b>Map Services Suite</b> by AtoZ Services—a modern, browser-based toolkit for interactive mapping, place search, and geospatial visualization. Harness the power of open-source maps and professional UI for your projects, research, or exploration.
+            </p>
+            <div style="margin-top: 32px;">
+                <a id="launch-map-btn" href="#" class="cta-btn">Launch Map App</a>
+            </div>
+        </div>
+    </div>
+    <!-- Map App UI (hidden by default) -->
+    <div id="map-app-container" style="display:none;">
+        <header>
+            <h1>Pro Map App</h1>
+            <form id="search-form">
+                <input type="text" id="search-input" placeholder="Search for a place...">
+                <button type="submit">Search</button>
+            </form>
+            <button id="distance-btn" type="button">Distance</button>
+        </header>
+        <div id="map"></div>
+        <div id="popup"></div>
+    </div>
+    <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+    <script src="main.js"></script>
+    <script>
+    // Show map app and hide landing on button click
+    document.addEventListener('DOMContentLoaded', function() {
+        var btn = document.getElementById('launch-map-btn');
+        if (btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('landing-hero').style.display = 'none';
+                document.getElementById('map-app-container').style.display = '';
+            });
+        }
+    });
+    </script>
+</body>
+</html>
