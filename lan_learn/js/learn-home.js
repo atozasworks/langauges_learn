@@ -102,13 +102,18 @@ class LearnHome {
         };
 
         this.learners.push(newLearner);
+        
+        // Automatically select the new learner for studies
+        this.selectedLearners.push(newLearner.id);
+        
         this.saveLearners();
+        this.saveSelectedLearners();
         this.refreshTable();
         this.updateCounts();
 
         // Clear input
         input.value = '';
-        Utils.showToast('Learner added successfully', 'success');
+        Utils.showToast(`${formattedName} added and selected for studies`, 'success');
     }
 
     deleteLearner(id) {
@@ -274,7 +279,7 @@ class LearnHome {
         $('#learners-table').on('change', '.learner-checkbox', (e) => {
             const id = e.target.getAttribute('data-id');
             if (id) {
-                this.handleSelectLearner(id, e.target.checked);
+            this.handleSelectLearner(id, e.target.checked);
             }
         });
 

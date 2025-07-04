@@ -22,27 +22,31 @@
 
 /* Navigation Buttons Container */
 .btn-cons {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
+    flex-direction: column;
     gap: 10px;
-    justify-content: center;
-    align-items: center;
-    margin: 10px 0;
+    z-index: 10;
 }
 
 .btn-up-dw {
     background-color: #3498db;
     color: #ffffff;
     border: none;
-    border-radius: 20px;
-    padding: 10px 15px;
+    border-radius: 50%;
+    padding: 8px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: background-color 0.3s ease, transform 0.2s ease;
-    width: 50px;
-    height: 50px;
+    width: 40px;
+    height: 40px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .btn-up-dw:hover {
@@ -127,11 +131,13 @@
 
 /* Conversation Block */
 .conversation-block {
+    position: relative;
     height: 55vh;
     width: 90%;
     max-width: 800px;
     background-color: #fff;
     padding: 20px;
+    padding-right: 80px; /* Add space for navigation buttons */
     border-radius: 12px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     overflow-y: auto;
@@ -320,6 +326,7 @@
     .conversation-block {
         height: 50vh;
         padding: 15px;
+        padding-right: 70px; /* Adjust space for navigation buttons on mobile */
         width: 95%;
     }
     
@@ -340,9 +347,16 @@
     }
     
     .btn-up-dw {
-        width: 40px;
-        height: 40px;
-        font-size: 14px;
+        width: 30px;
+        height: 30px;
+        font-size: 10px;
+    }
+    
+    .btn-cons {
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        gap: 5px;
     }
     
     .button-con {
@@ -381,6 +395,7 @@
     .conversation-block {
         height: 40vh;
         padding: 10px;
+        padding-right: 50px; /* Adjust space for navigation buttons on smaller screens */
     }
     
     .script-text {

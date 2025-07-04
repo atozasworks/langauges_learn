@@ -66,8 +66,18 @@ class GTongueLearnApp {
             const selectedLanguage = e.target.value;
             const currentLanguage = this.translationService?.getCurrentLanguage() || 'en';
             
-            // Don't change if it's the same language
-            if (selectedLanguage === currentLanguage) {
+            // Don't change if it's the same language (unless it's English and we need to force it)
+            if (selectedLanguage === currentLanguage && selectedLanguage !== 'en') {
+                return;
+            }
+            
+            // Special handling for English selection
+            if (selectedLanguage === 'en') {
+                console.log('English selected from dropdown - forcing English display');
+                // Don't use translation service for English, just reload
+                localStorage.setItem('ensure_english_display', 'true');
+                localStorage.removeItem('preferred_language');
+                window.location.reload();
                 return;
             }
 
