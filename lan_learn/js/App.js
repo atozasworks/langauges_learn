@@ -131,8 +131,15 @@ class GTongueLearnApp {
         const navLinks = document.querySelectorAll('.nav-link');
         navLinks.forEach(link => {
             link.addEventListener('click', (e) => {
-                e.preventDefault();
                 const href = link.getAttribute('href');
+                
+                // Skip navigation handling for external links (GitHub link)
+                if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+                    // Let the link open normally in a new tab
+                    return;
+                }
+                
+                e.preventDefault();
                 const page = href.substring(1); // Remove the # from href
                 this.showPage(page);
                 this.updateActiveNavLink(link);
@@ -146,6 +153,10 @@ class GTongueLearnApp {
 
         document.getElementById('about-back-btn')?.addEventListener('click', () => {
             this.showPage('dialogue');
+        });
+
+        document.getElementById('opensource-back-btn')?.addEventListener('click', () => {
+            this.showPage('home');
         });
 
         document.getElementById('about-btn')?.addEventListener('click', () => {
@@ -167,6 +178,9 @@ class GTongueLearnApp {
 
         // Update navigation
         this.updateNavigation(pageId);
+        
+        // Reinitialize Lucide icons for the new page
+        setTimeout(() => this.initializeLucideIcons(), 100);
     }
 
     updateActiveNavLink(activeLink) {
