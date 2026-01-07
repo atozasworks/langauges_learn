@@ -131,6 +131,19 @@
             Language Learning - <span id="current-language">English</span>
           </h1>
 
+          <!-- Group Info Display -->
+          <div class="group-info-container">
+            <div class="group-info-card">
+              <h3 class="group-info-title">Learning Group</h3>
+              <div class="group-learners-list" id="group-learners-list">
+                <!-- Learner names will be populated here -->
+              </div>
+              <div class="group-count">
+                Total Learners: <span id="group-learners-count">0</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Conversation Selector -->
           <select class="conversation-selector" id="conversation-selector">
             <option value="0">Select Conversation</option>
@@ -150,6 +163,24 @@
             <div class="script-text" id="script-text">
               <div class="loading">Loading dialogue...</div>
             </div>
+          </div>
+
+          <!-- Enable/Disable Group Communication -->
+          <div class="audio-button-container">
+            <button id="enable-communication-btn" class="enable-button">
+              <i data-lucide="radio"></i>
+              <span>Enable Group Communication</span>
+            </button>
+            <button id="disable-communication-btn" class="disable-button" style="display: none;">
+              <i data-lucide="radio-off"></i>
+              <span>Disable Group Communication</span>
+            </button>
+          </div>
+
+          <!-- Group Communication Status -->
+          <div class="communication-status" id="communication-status" style="display: none;">
+            <i data-lucide="users"></i>
+            <span>Group communication active - Click speak button on any dialog to share with group</span>
           </div>
 
           <!-- Button Container -->
@@ -385,7 +416,7 @@
     <div id="toast-container"></div>
 
     <script src="js/translation-service.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/App.js"></script>
     <script src="js/learn-home.js"></script>
     <script src="js/dialogue-data.js"></script>
     <script src="js/dialogue.js"></script>

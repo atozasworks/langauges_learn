@@ -152,23 +152,7 @@
     white-space: pre-wrap;
 }
 
-/* Highlighted Line */
-.highlighted-line {
-    background-color: #000;
-    color: #fff;
-    padding: 10px;
-    border-radius: 4px;
-    margin: 5px 0;
-    font-size: 1.4em;
-    box-shadow: 0 4px 8px rgba(108, 105, 105, 0.2);
-    transform: scale(0.9);
-    transition: all 0.3s ease;
-    white-space: normal;
-    word-wrap: break-word;
-    max-width: fit-content;
-    display: inline-block;
-    z-index: 999;
-}
+/* Highlighted Line - now handled in .dialogue-line.highlighted-line */
 
 .highlighted-line .learner-name {
     color: #ff6b6b !important;
@@ -181,6 +165,163 @@
 
 .highlighted-line .conversation-text {
     color: white !important;
+}
+
+/* Enable/Disable Communication Buttons */
+.audio-button-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.enable-button,
+.disable-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.enable-button {
+    background-color: #10b981;
+    color: white;
+}
+
+.enable-button:hover {
+    background-color: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.disable-button {
+    background-color: #ef4444;
+    color: white;
+}
+
+.disable-button:hover {
+    background-color: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.enable-button i,
+.disable-button i {
+    width: 20px;
+    height: 20px;
+}
+
+/* Communication Status */
+.communication-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 20px;
+    background-color: #10b981;
+    color: white;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin: 10px auto;
+    max-width: 600px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.communication-status i {
+    width: 18px;
+    height: 18px;
+}
+
+/* Dialogue Line with Speak Button */
+.dialogue-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 5px 0;
+}
+
+.dialogue-line.highlighted-line {
+    background-color: #000;
+    color: #fff;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 5px 0;
+    font-size: 1.4em;
+    box-shadow: 0 4px 8px rgba(108, 105, 105, 0.2);
+    transform: scale(0.9);
+    transition: all 0.3s ease;
+    white-space: normal;
+    word-wrap: break-word;
+    max-width: fit-content;
+    display: inline-flex;
+    z-index: 999;
+}
+
+.dialogue-line.recording-line {
+    border: 2px solid #ef4444;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+/* Speak Button */
+.speak-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: #3b82f6;
+    color: white;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.speak-btn:hover {
+    background-color: #2563eb;
+    transform: scale(1.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.speak-btn:active {
+    transform: scale(0.95);
+}
+
+.speak-btn.recording {
+    background-color: #ef4444 !important;
+    animation: pulse-recording 1.5s infinite;
+}
+
+@keyframes pulse-recording {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    50% {
+        opacity: 0.9;
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    }
+}
+
+.speak-btn i {
+    width: 16px;
+    height: 16px;
+}
+
+.speak-btn span {
+    font-size: 0.85rem;
 }
 
 /* Button Container */
@@ -212,6 +353,224 @@
     background-color: #ccc;
     color: #666;
     cursor: not-allowed;
+}
+
+/* Group Info Container */
+.group-info-container {
+    width: 90%;
+    max-width: 800px;
+    margin-bottom: 20px;
+}
+
+.group-info-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.group-info-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.group-learners-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 15px;
+}
+
+.group-learners-list .learner-badge {
+    background-color: rgba(255, 255, 255, 0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.group-count {
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 600;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Dialog Counter */
+.dialog-counter {
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #667eea;
+    margin-bottom: 15px;
+    padding: 8px 16px;
+    background-color: rgba(102, 126, 234, 0.1);
+    border-radius: 8px;
+    display: inline-block;
+}
+
+/* Dialog Display Container */
+.dialog-display-container {
+    width: 90%;
+    max-width: 800px;
+    min-height: 200px;
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dialog-text {
+    font-family: "Courier New", monospace;
+    font-size: 1.8rem;
+    color: #34495e;
+    line-height: 1.8;
+    text-align: center;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    width: 100%;
+}
+
+.dialog-text .learner-name {
+    color: #667eea;
+    font-weight: bold;
+}
+
+.dialog-text .conversation-text {
+    color: #2c3e50;
+}
+
+/* Dialog Controls */
+.dialog-controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.control-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.control-btn i {
+    width: 20px;
+    height: 20px;
+}
+
+.control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.control-btn:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.audio-btn {
+    background-color: #10b981;
+    color: white;
+}
+
+.audio-btn:hover:not(:disabled) {
+    background-color: #059669;
+}
+
+.microphone-btn {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.microphone-btn:hover:not(:disabled) {
+    background-color: #2563eb;
+}
+
+.microphone-btn.recording {
+    background-color: #ef4444;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.next-btn {
+    background-color: #f59e0b;
+    color: white;
+}
+
+.next-btn:hover:not(:disabled) {
+    background-color: #d97706;
+}
+
+/* Audio Status Indicator */
+.audio-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background-color: #10b981;
+    color: white;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 20px;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.audio-status i {
+    width: 18px;
+    height: 18px;
+    animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
 }
 
 /* About Page Styles */
@@ -385,6 +744,76 @@
     .text-2xl {
         font-size: 1.25rem;
     }
+    
+    .group-info-container {
+        width: 95%;
+    }
+    
+    .group-info-card {
+        padding: 15px;
+    }
+    
+    .group-info-title {
+        font-size: 1rem;
+    }
+    
+    .group-learners-list .learner-badge {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+    }
+    
+    .dialog-display-container {
+        width: 95%;
+        padding: 20px;
+    }
+    
+    .dialog-text {
+        font-size: 1.4rem;
+    }
+    
+    .dialog-controls {
+        gap: 10px;
+    }
+    
+    .control-btn {
+        padding: 10px 18px;
+        font-size: 0.9rem;
+    }
+    
+    .audio-button-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .enable-button,
+    .disable-button {
+        width: 100%;
+        justify-content: center;
+        padding: 10px 20px;
+        font-size: 0.9rem;
+    }
+    
+    .communication-status {
+        font-size: 0.8rem;
+        padding: 10px 15px;
+        flex-wrap: wrap;
+        text-align: center;
+    }
+    
+    .dialogue-line {
+        flex-wrap: wrap;
+    }
+    
+    .speak-btn {
+        margin-top: 5px;
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .dialogue-line.highlighted-line {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }
 
 @media (max-width: 480px) {
@@ -429,5 +858,41 @@
     
     .text-2xl {
         font-size: 1.125rem;
+    }
+    
+    .group-info-card {
+        padding: 12px;
+    }
+    
+    .group-info-title {
+        font-size: 0.9rem;
+    }
+    
+    .group-learners-list {
+        gap: 8px;
+    }
+    
+    .group-learners-list .learner-badge {
+        font-size: 0.75rem;
+        padding: 5px 10px;
+    }
+    
+    .dialog-display-container {
+        padding: 15px;
+    }
+    
+    .dialog-text {
+        font-size: 1.2rem;
+    }
+    
+    .dialog-controls {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .control-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 12px;
     }
 } 
