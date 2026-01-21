@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GTongue Learn - Language Learning Platform</title>
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="A standalone language learning application for learning new languages through dialogues" />
+    <meta name="theme-color" content="#10b981" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="GTongue Learn" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json" />
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png" />
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png" />
     <link rel="stylesheet" href="styles/style.css" />
     <link rel="stylesheet" href="styles/learn-home.css" />
     <link rel="stylesheet" href="styles/dialogue.css" />
@@ -378,6 +392,28 @@
       </div>
     </div>
 
+    <!-- PWA Install Popup -->
+    <div id="pwa-install-popup" class="popup-overlay" style="opacity: 0;">
+      <div class="popup-content">
+        <div style="text-align: center; margin-bottom: 1rem;">
+          <div style="font-size: 3rem; margin-bottom: 0.5rem;">📱</div>
+          <h3 style="margin: 0.5rem 0; color: #10b981; font-size: 1.5rem;">Install GTongue Learn</h3>
+        </div>
+        <p id="pwa-install-message" style="margin: 1rem 0; color: #666;">
+          Install this app on your device for a better experience. You can use it offline and access it directly from your home screen!
+        </p>
+        <div class="popup-buttons">
+          <button id="pwa-install-btn" class="popup-btn" style="background-color: #10b981; color: white; flex: 1;">
+            <i data-lucide="download" style="width: 18px; height: 18px; margin-right: 5px;"></i>
+            Install App
+          </button>
+          <button id="pwa-dismiss-btn" class="popup-btn cancel-btn" style="flex: 1;">
+            Maybe Later
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Google Translate Element (hidden) -->
     <div id="google_translate_element" style="display: none"></div>
 
@@ -390,5 +426,6 @@
     <script src="js/dialogue-data.js"></script>
     <script src="js/dialogue.js"></script>
     <script src="js/utils.js"></script>
+    <script src="js/pwa-install.js"></script>
   </body>
 </html>

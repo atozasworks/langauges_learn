@@ -263,10 +263,13 @@ button:disabled {
     justify-content: center;
     align-items: center;
     z-index: 2000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .popup-overlay.show {
     display: flex;
+    opacity: 1;
 }
 
 .popup-content {
