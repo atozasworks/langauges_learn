@@ -8,7 +8,7 @@ const DEFAULT_LEARNERS = [
     'Tiju',
     'Reena',
     'Bhavishya',
-    'Iflha',
+    'Iflaha',
     'Samsheena',
     'Sharan',
     'Geetha',
