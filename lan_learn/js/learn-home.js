@@ -12,6 +12,10 @@ class LearnHome {
         this.setupEventListeners();
         this.initializeDataTable();
         this.updateCounts();
+        // Update select-all checkbox after initialization
+        setTimeout(() => {
+            this.updateSelectAllCheckbox();
+        }, 100);
         console.log('Learn Home initialized');
     }
 
@@ -332,12 +336,46 @@ class LearnHome {
         this.learners = Utils.getFromStorage('learners', []);
         this.selectedLearners = Utils.getFromStorage('selectedLearners', []);
         
+        // If no learners exist in storage, load default learners
+        const loadedDefaults = this.learners.length === 0 && typeof DEFAULT_LEARNERS !== 'undefined';
+        if (loadedDefaults) {
+            this.loadDefaultLearners();
+        }
+        
         // Clean up selected learners (remove IDs that no longer exist)
         this.selectedLearners = this.selectedLearners.filter(id =>
             this.learners.some(learner => learner.id === id)
         );
         
+        // If no learners are selected but learners exist (and we didn't just load defaults),
+        // select all by default
+        if (!loadedDefaults && this.selectedLearners.length === 0 && this.learners.length > 0) {
+            this.selectedLearners = this.learners.map(learner => learner.id);
+        }
+        
         this.saveSelectedLearners();
+    }
+
+    loadDefaultLearners() {
+        if (typeof DEFAULT_LEARNERS === 'undefined' || !Array.isArray(DEFAULT_LEARNERS)) {
+            console.warn('DEFAULT_LEARNERS not available');
+            return;
+        }
+
+        // Create learner objects from default names
+        this.learners = DEFAULT_LEARNERS.map(name => ({
+            id: Utils.generateId(),
+            name: Utils.formatName(name.trim())
+        }));
+
+        // Select all default learners by default
+        this.selectedLearners = this.learners.map(learner => learner.id);
+
+        // Save to storage
+        this.saveLearners();
+        this.saveSelectedLearners();
+
+        console.log(`Loaded ${this.learners.length} default learners, all selected by default`);
     }
 
     saveLearners() {
