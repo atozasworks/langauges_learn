@@ -165,6 +165,13 @@ class GTongueLearnApp {
     }
 
     showPage(pageId) {
+        const previousPage = this.currentPage;
+
+        // Pause auto-advance when leaving Dialogue page
+        if (previousPage === 'dialogue' && pageId !== 'dialogue') {
+            window.dialoguePage?.stopAutoAdvance?.();
+        }
+
         // Hide all pages
         const pages = document.querySelectorAll('.page');
         pages.forEach(page => page.classList.remove('active'));
@@ -174,6 +181,11 @@ class GTongueLearnApp {
         if (targetPage) {
             targetPage.classList.add('active');
             this.currentPage = pageId;
+        }
+
+        // Resume auto-advance when returning to Dialogue page
+        if (pageId === 'dialogue' && previousPage !== 'dialogue') {
+            window.dialoguePage?.resumeAutoAdvance?.();
         }
 
         // Update navigation
