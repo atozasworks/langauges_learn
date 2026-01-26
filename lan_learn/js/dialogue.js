@@ -8,6 +8,15 @@ class DialoguePage {
         this.currentLineIndex = -1;
         this.isLoading = false;
         this.currentLanguage = 'English';
+
+        // Auto-advance (dialog-to-dialog) settings
+        this.autoAdvanceEnabled = true;
+        this.autoAdvanceInitialDelayMs = 4000; // first line in a new conversation
+        this.autoAdvanceDelayMs = 3000; // subsequent lines
+        this.autoAdvanceTimeoutId = null;
+
+        // Keep initial-vs-normal gap consistent when changing speed via slider
+        this.autoAdvanceInitialOffsetMs = Math.max(0, this.autoAdvanceInitialDelayMs - this.autoAdvanceDelayMs);
         this.init();
     }
 
@@ -30,6 +39,8 @@ class DialoguePage {
         const nextConversationBtn = document.getElementById('next-conversation-btn');
         const prevLineBtn = document.getElementById('prev-line-btn');
         const nextLineBtn = document.getElementById('next-line-btn');
+        const toggleAutoAdvanceBtn = document.getElementById('toggle-auto-advance-btn');
+        const speedSlider = document.getElementById('speed-slider');
 
         if (prevConversationBtn) {
             prevConversationBtn.addEventListener('click', () => this.previousConversation());
@@ -46,6 +57,156 @@ class DialoguePage {
         if (nextLineBtn) {
             nextLineBtn.addEventListener('click', () => this.nextLine());
         }
+
+        if (toggleAutoAdvanceBtn) {
+            toggleAutoAdvanceBtn.addEventListener('click', () => this.toggleAutoAdvance());
+            this._syncAutoAdvanceButton();
+        }
+
+        if (speedSlider) {
+            this._initSpeedSlider(speedSlider);
+            speedSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value, 10);
+                this.setAutoAdvanceSpeed(value);
+            });
+        }
+    }
+
+    _initSpeedSlider(speedSlider) {
+        // Ensure default knob starts in the middle based on current code value
+        const min = 1000;
+        const max = Math.max(min + 1000, (this.autoAdvanceDelayMs * 2) - min);
+        speedSlider.min = String(min);
+        speedSlider.max = String(max);
+        speedSlider.step = '250';
+        speedSlider.value = String(this.autoAdvanceDelayMs);
+        this._updateSpeedValueUI(this.autoAdvanceDelayMs);
+    }
+
+    _updateSpeedValueUI(delayMs) {
+        const el = document.getElementById('speed-value');
+        if (!el) return;
+        el.textContent = `${(delayMs / 1000).toFixed(1)}s`;
+    }
+
+    setAutoAdvanceSpeed(delayMs) {
+        const safeDelayMs = Math.max(250, Number.isFinite(delayMs) ? delayMs : this.autoAdvanceDelayMs);
+        this.autoAdvanceDelayMs = safeDelayMs;
+        this.autoAdvanceInitialDelayMs = safeDelayMs + this.autoAdvanceInitialOffsetMs;
+        this._updateSpeedValueUI(safeDelayMs);
+
+        // If currently running, reschedule with new speed
+        if (this.autoAdvanceEnabled) {
+            if (this._hasNextLine() || this._hasNextConversation()) {
+                const delay = this._isAtFirstLearnerLine()
+                    ? this.autoAdvanceInitialDelayMs
+                    : this.autoAdvanceDelayMs;
+                this._scheduleAutoAdvance(delay);
+            } else {
+                this.stopAutoAdvance();
+            }
+        }
+    }
+
+    toggleAutoAdvance() {
+        this.autoAdvanceEnabled = !this.autoAdvanceEnabled;
+
+        if (!this.autoAdvanceEnabled) {
+            this.stopAutoAdvance();
+        } else {
+            // When resuming, prefer the "initial delay" if currently at the first learner line
+            if (this._hasNextLine() || this._hasNextConversation()) {
+                const delay = this._isAtFirstLearnerLine()
+                    ? this.autoAdvanceInitialDelayMs
+                    : this.autoAdvanceDelayMs;
+                this._scheduleAutoAdvance(delay);
+            }
+        }
+
+        this._syncAutoAdvanceButton();
+    }
+
+    _isAtFirstLearnerLine() {
+        if (this.currentConversationIndex >= this.modifiedDialogue.length) return false;
+        if (this.currentLineIndex < 0) return false;
+
+        const conversation = this.modifiedDialogue[this.currentConversationIndex];
+        const lines = conversation.split('\n');
+        const firstLearnerLineIndex = lines.findIndex(line => line.includes('learner-name'));
+        return firstLearnerLineIndex >= 0 && this.currentLineIndex === firstLearnerLineIndex;
+    }
+
+    _syncAutoAdvanceButton() {
+        const btn = document.getElementById('toggle-auto-advance-btn');
+        if (!btn) return;
+
+        const isPaused = !this.autoAdvanceEnabled;
+        btn.classList.toggle('is-paused', isPaused);
+        btn.title = isPaused ? 'Resume auto scroll' : 'Pause auto scroll';
+        btn.setAttribute('aria-label', isPaused ? 'Resume auto scroll' : 'Pause auto scroll');
+
+        // Swap icon (lucide)
+        btn.innerHTML = `<i data-lucide="${isPaused ? 'play' : 'pause'}"></i>`;
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    stopAutoAdvance() {
+        if (this.autoAdvanceTimeoutId) {
+            clearTimeout(this.autoAdvanceTimeoutId);
+            this.autoAdvanceTimeoutId = null;
+        }
+    }
+
+    resumeAutoAdvance() {
+        if (!this.autoAdvanceEnabled) return;
+        if (this.isLoading) return;
+        if (!this._hasNextLine() && !this._hasNextConversation()) return;
+        this._scheduleAutoAdvance(this.autoAdvanceDelayMs);
+    }
+
+    _scheduleAutoAdvance(delayMs) {
+        if (!this.autoAdvanceEnabled) return;
+        this.stopAutoAdvance();
+        this.autoAdvanceTimeoutId = setTimeout(() => {
+            this.autoAdvanceTimeoutId = null;
+            this._autoAdvanceTick();
+        }, delayMs);
+    }
+
+    _autoAdvanceTick() {
+        if (!this.autoAdvanceEnabled) return;
+        if (this.isLoading) return;
+
+        const didAdvance = this.nextLine({ fromAutoAdvance: true });
+        if (didAdvance) {
+            this._scheduleAutoAdvance(this.autoAdvanceDelayMs);
+            return;
+        }
+
+        // If conversation ended, jump to next conversation automatically
+        if (this._hasNextConversation()) {
+            this.setCurrentConversation(this.currentConversationIndex + 1);
+            return; // setCurrentConversation schedules the initial delay
+        }
+
+        // Last conversation finished
+        this.stopAutoAdvance();
+    }
+
+    _hasNextLine() {
+        if (this.currentConversationIndex >= this.modifiedDialogue.length) return false;
+        if (this.currentLineIndex < 0) return false;
+
+        const conversation = this.modifiedDialogue[this.currentConversationIndex];
+        const lines = conversation.split('\n');
+        return this.currentLineIndex < lines.length - 1;
+    }
+
+    _hasNextConversation() {
+        return this.currentConversationIndex >= 0 &&
+               this.currentConversationIndex < this.modifiedDialogue.length - 1;
     }
 
     async initializeWithLearners(learnerNames) {
@@ -134,6 +295,10 @@ class DialoguePage {
                 if (currentLine >= 0) {
                     this.currentLineIndex = currentLine;
                     this.displayConversation();
+                    this.scrollToHighlightedLine();
+                    if (this.autoAdvanceEnabled) {
+                        this.resumeAutoAdvance();
+                    }
                 }
             }, 500);
         }
@@ -369,6 +534,7 @@ splitIntoConversations(text) {
 
         this.currentConversationIndex = index;
         this.currentLineIndex = -1;
+        this.stopAutoAdvance();
         
         // Update conversation selector
         const selector = document.getElementById('conversation-selector');
@@ -381,6 +547,12 @@ splitIntoConversations(text) {
         
         // Set current line to first learner line
         this.setFirstLearnerLine();
+
+        // Auto-advance: first line should stay longer (6s) for every new conversation
+        if (this.autoAdvanceEnabled) {
+            this._scheduleAutoAdvance(this.autoAdvanceInitialDelayMs);
+        }
+        this._syncAutoAdvanceButton();
         
         // Update navigation buttons
         this.updateNavigationButtons();
@@ -425,21 +597,30 @@ splitIntoConversations(text) {
         this.scrollToHighlightedLine();
     }
 
-    nextLine() {
+    nextLine(options = {}) {
         if (this.currentConversationIndex >= this.modifiedDialogue.length) {
-            return;
+            return false;
         }
 
         const conversation = this.modifiedDialogue[this.currentConversationIndex];
         const lines = conversation.split('\n');
+        let didAdvance = false;
         
         if (this.currentLineIndex < lines.length - 1) {
             this.currentLineIndex++;
             this.displayConversation();
             this.scrollToHighlightedLine();
+            didAdvance = true;
         }
         
         this.updateNavigationButtons();
+
+        // Manual navigation should restart auto-advance with normal delay (5s)
+        if (!options.fromAutoAdvance && this.autoAdvanceEnabled) {
+            this.resumeAutoAdvance();
+        }
+
+        return didAdvance;
     }
 
     previousLine() {
@@ -450,6 +631,11 @@ splitIntoConversations(text) {
         }
         
         this.updateNavigationButtons();
+
+        // Manual navigation should restart auto-advance with normal delay (5s)
+        if (this.autoAdvanceEnabled) {
+            this.resumeAutoAdvance();
+        }
     }
 
     nextConversation() {
