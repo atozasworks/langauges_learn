@@ -14,6 +14,9 @@ class DialoguePage {
         this.autoAdvanceInitialDelayMs = 4000; // first line in a new conversation
         this.autoAdvanceDelayMs = 3000; // subsequent lines
         this.autoAdvanceTimeoutId = null;
+
+        // Keep initial-vs-normal gap consistent when changing speed via slider
+        this.autoAdvanceInitialOffsetMs = Math.max(0, this.autoAdvanceInitialDelayMs - this.autoAdvanceDelayMs);
         this.init();
     }
 
@@ -37,6 +40,7 @@ class DialoguePage {
         const prevLineBtn = document.getElementById('prev-line-btn');
         const nextLineBtn = document.getElementById('next-line-btn');
         const toggleAutoAdvanceBtn = document.getElementById('toggle-auto-advance-btn');
+        const speedSlider = document.getElementById('speed-slider');
 
         if (prevConversationBtn) {
             prevConversationBtn.addEventListener('click', () => this.previousConversation());
@@ -57,6 +61,50 @@ class DialoguePage {
         if (toggleAutoAdvanceBtn) {
             toggleAutoAdvanceBtn.addEventListener('click', () => this.toggleAutoAdvance());
             this._syncAutoAdvanceButton();
+        }
+
+        if (speedSlider) {
+            this._initSpeedSlider(speedSlider);
+            speedSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value, 10);
+                this.setAutoAdvanceSpeed(value);
+            });
+        }
+    }
+
+    _initSpeedSlider(speedSlider) {
+        // Ensure default knob starts in the middle based on current code value
+        const min = 1000;
+        const max = Math.max(min + 1000, (this.autoAdvanceDelayMs * 2) - min);
+        speedSlider.min = String(min);
+        speedSlider.max = String(max);
+        speedSlider.step = '250';
+        speedSlider.value = String(this.autoAdvanceDelayMs);
+        this._updateSpeedValueUI(this.autoAdvanceDelayMs);
+    }
+
+    _updateSpeedValueUI(delayMs) {
+        const el = document.getElementById('speed-value');
+        if (!el) return;
+        el.textContent = `${(delayMs / 1000).toFixed(1)}s`;
+    }
+
+    setAutoAdvanceSpeed(delayMs) {
+        const safeDelayMs = Math.max(250, Number.isFinite(delayMs) ? delayMs : this.autoAdvanceDelayMs);
+        this.autoAdvanceDelayMs = safeDelayMs;
+        this.autoAdvanceInitialDelayMs = safeDelayMs + this.autoAdvanceInitialOffsetMs;
+        this._updateSpeedValueUI(safeDelayMs);
+
+        // If currently running, reschedule with new speed
+        if (this.autoAdvanceEnabled) {
+            if (this._hasNextLine() || this._hasNextConversation()) {
+                const delay = this._isAtFirstLearnerLine()
+                    ? this.autoAdvanceInitialDelayMs
+                    : this.autoAdvanceDelayMs;
+                this._scheduleAutoAdvance(delay);
+            } else {
+                this.stopAutoAdvance();
+            }
         }
     }
 

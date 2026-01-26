@@ -7,8 +7,8 @@ class LearnHome {
         this.init();
     }
 
-    init() {
-        this.loadLearners();
+    async init() {
+        await this.loadLearners();
         this.setupEventListeners();
         this.initializeDataTable();
         this.updateCounts();
@@ -332,14 +332,13 @@ class LearnHome {
         }
     }
 
-    loadLearners() {
+    async loadLearners() {
         this.learners = Utils.getFromStorage('learners', []);
         this.selectedLearners = Utils.getFromStorage('selectedLearners', []);
         
-        // If no learners exist in storage, load default learners
-        const loadedDefaults = this.learners.length === 0 && typeof DEFAULT_LEARNERS !== 'undefined';
-        if (loadedDefaults) {
-            this.loadDefaultLearners();
+        // If no learners exist in storage, load default learners from JSON
+        if (this.learners.length === 0) {
+            await this.loadDefaultLearners();
         }
         
         // Clean up selected learners (remove IDs that no longer exist)
@@ -347,35 +346,64 @@ class LearnHome {
             this.learners.some(learner => learner.id === id)
         );
         
-        // If no learners are selected but learners exist (and we didn't just load defaults),
+        // If no learners are selected but learners exist,
         // select all by default
-        if (!loadedDefaults && this.selectedLearners.length === 0 && this.learners.length > 0) {
+        if (this.selectedLearners.length === 0 && this.learners.length > 0) {
             this.selectedLearners = this.learners.map(learner => learner.id);
         }
         
         this.saveSelectedLearners();
     }
 
-    loadDefaultLearners() {
-        if (typeof DEFAULT_LEARNERS === 'undefined' || !Array.isArray(DEFAULT_LEARNERS)) {
-            console.warn('DEFAULT_LEARNERS not available');
-            return;
+    async loadDefaultLearners() {
+        try {
+            // Fetch default learners from JSON file
+            const response = await fetch('js/default-learners.json');
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch default learners: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const defaultNames = data.learners || [];
+            
+            if (!Array.isArray(defaultNames) || defaultNames.length === 0) {
+                console.warn('No default learners found in JSON file');
+                return;
+            }
+
+            // Create learner objects from default names
+            this.learners = defaultNames.map(name => ({
+                id: Utils.generateId(),
+                name: Utils.formatName(name.trim())
+            }));
+
+            // Select all default learners by default
+            this.selectedLearners = this.learners.map(learner => learner.id);
+
+            // Save to storage
+            this.saveLearners();
+            this.saveSelectedLearners();
+
+            console.log(`Loaded ${this.learners.length} default learners from JSON, all selected by default`);
+        } catch (error) {
+            console.error('Error loading default learners from JSON:', error);
+            
+            // Fallback to JavaScript constant if available (for backward compatibility)
+            if (typeof DEFAULT_LEARNERS !== 'undefined' && Array.isArray(DEFAULT_LEARNERS)) {
+                console.log('Falling back to JavaScript DEFAULT_LEARNERS constant');
+                this.learners = DEFAULT_LEARNERS.map(name => ({
+                    id: Utils.generateId(),
+                    name: Utils.formatName(name.trim())
+                }));
+                this.selectedLearners = this.learners.map(learner => learner.id);
+                this.saveLearners();
+                this.saveSelectedLearners();
+                console.log(`Loaded ${this.learners.length} default learners from JavaScript constant`);
+            } else {
+                console.warn('No default learners available');
+            }
         }
-
-        // Create learner objects from default names
-        this.learners = DEFAULT_LEARNERS.map(name => ({
-            id: Utils.generateId(),
-            name: Utils.formatName(name.trim())
-        }));
-
-        // Select all default learners by default
-        this.selectedLearners = this.learners.map(learner => learner.id);
-
-        // Save to storage
-        this.saveLearners();
-        this.saveSelectedLearners();
-
-        console.log(`Loaded ${this.learners.length} default learners, all selected by default`);
     }
 
     saveLearners() {

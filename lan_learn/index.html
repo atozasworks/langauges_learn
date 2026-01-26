@@ -150,6 +150,21 @@
             <option value="0">Select Conversation</option>
           </select>
 
+          <!-- Speed Control -->
+          <div class="speed-control" id="speed-control">
+            <label for="speed-slider" class="speed-label">Auto speed</label>
+            <input
+              type="range"
+              id="speed-slider"
+              class="speed-slider"
+              min="1000"
+              max="5000"
+              step="250"
+              value="3000"
+            />
+            <span id="speed-value" class="speed-value">3.0s</span>
+          </div>
+
           <!-- Conversation Block with Navigation Buttons -->
           <div class="conversation-block">
             <!-- Navigation Buttons on the right side -->
