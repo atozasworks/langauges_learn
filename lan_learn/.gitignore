@@ -1,5 +1,7 @@
 # Default Learners JSON file (contains user-specific data)
+# Ignore the default learners JSON file
 js/default-learners.json
+**/default-learners.json
 
 # Node modules (if any)
 node_modules/
