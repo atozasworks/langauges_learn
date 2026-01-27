@@ -572,7 +572,24 @@ splitIntoConversations(text) {
         const lines = dialogue.split('\n');
         return lines.map((line, index) => {
             const isHighlighted = index === this.currentLineIndex;
-            const className = isHighlighted ? 'highlighted-line' : '';
+            const trimmedLine = line.trim();
+            
+            // Detect "Conversation X" lines (smaller font)
+            const isConversationNumber = trimmedLine.startsWith('Conversation ') && /^Conversation \d+/.test(trimmedLine);
+            
+            // Detect "Basic Introduction and Greetings" type titles (larger font, bold, underline)
+            const isConversationTitle = trimmedLine.includes('Basic Introduction') || 
+                                       (trimmedLine !== '' && !trimmedLine.includes(':') && 
+                                        !isConversationNumber && trimmedLine.length > 10 && 
+                                        !trimmedLine.match(/^Person \d+:/));
+            
+            let className = isHighlighted ? 'highlighted-line' : '';
+            if (isConversationNumber) {
+                className = className ? `${className} conversation-number` : 'conversation-number';
+            } else if (isConversationTitle) {
+                className = className ? `${className} conversation-title` : 'conversation-title';
+            }
+            
             const id = isHighlighted ? 'highlighted-line' : '';
             
             return `<div class="${className}" id="${id}">${line}</div>`;
