@@ -207,6 +207,18 @@ class LearnHome {
             // Initialize dialogue page with selected learners
             if (window.dialoguePage) {
                 window.dialoguePage.initializeWithLearners(this.getSelectedLearnerNames());
+                // Start timer with default duration (30 minutes)
+                // User can change duration from dialogue page dropdown
+                if (window.learningTimer) {
+                    const defaultDuration = 30;
+                    // Sync duration dropdown in dialogue page
+                    const timerDurationSelect = document.getElementById('timer-duration-select');
+                    if (timerDurationSelect) {
+                        timerDurationSelect.value = defaultDuration;
+                    }
+                    window.learningTimer.init(defaultDuration);
+                    window.learningTimer.start();
+                }
             }
         }
     }

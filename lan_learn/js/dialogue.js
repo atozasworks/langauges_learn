@@ -22,7 +22,47 @@ class DialoguePage {
 
     init() {
         this.setupEventListeners();
+        this.setupTimer();
         console.log('Dialogue Page initialized');
+    }
+
+    setupTimer() {
+        // Setup timer pause button
+        const pauseBtn = document.getElementById('timer-pause-btn');
+        if (pauseBtn) {
+            pauseBtn.addEventListener('click', () => {
+                if (window.learningTimer) {
+                    const wasPaused = window.learningTimer.isPaused;
+                    window.learningTimer.togglePause();
+                    
+                    // Sync dialogue auto-advance with timer pause state
+                    if (window.learningTimer.isPaused) {
+                        // Timer is now paused, pause dialogue auto-advance
+                        this.stopAutoAdvance();
+                    } else if (wasPaused) {
+                        // Timer resumed from pause, resume dialogue auto-advance if it was enabled
+                        if (this.autoAdvanceEnabled) {
+                            this.resumeAutoAdvance();
+                        }
+                    }
+                }
+            });
+        }
+                                                                                               
+        // Setup duration dropdown in dialogue page
+        const durationSelect = document.getElementById('timer-duration-select');
+        if (durationSelect) {
+            durationSelect.addEventListener('change', (e) => {
+                const newDuration = parseInt(e.target.value, 10);
+                if (window.learningTimer) {
+                    // Reset timer with new duration
+                    window.learningTimer.init(newDuration);
+                    if (window.learningTimer.isRunning || window.learningTimer.isPaused) {
+                        window.learningTimer.start();
+                    }
+                }
+            });
+        }
     }
 
     setupEventListeners() {
@@ -58,10 +98,18 @@ class DialoguePage {
             nextLineBtn.addEventListener('click', () => this.nextLine());
         }
 
-        if (toggleAutoAdvanceBtn) {
-            toggleAutoAdvanceBtn.addEventListener('click', () => this.toggleAutoAdvance());
-            this._syncAutoAdvanceButton();
+        // Control panel navigation buttons (duplicate functionality)
+        const prevLineBtnControl = document.getElementById('prev-line-btn-control');
+        const nextLineBtnControl = document.getElementById('next-line-btn-control');
+        
+        if (prevLineBtnControl) {
+            prevLineBtnControl.addEventListener('click', () => this.previousLine());
         }
+
+        if (nextLineBtnControl) {
+            nextLineBtnControl.addEventListener('click', () => this.nextLine());
+        }
+
 
         if (speedSlider) {
             this._initSpeedSlider(speedSlider);
@@ -137,19 +185,8 @@ class DialoguePage {
     }
 
     _syncAutoAdvanceButton() {
-        const btn = document.getElementById('toggle-auto-advance-btn');
-        if (!btn) return;
-
-        const isPaused = !this.autoAdvanceEnabled;
-        btn.classList.toggle('is-paused', isPaused);
-        btn.title = isPaused ? 'Resume auto scroll' : 'Pause auto scroll';
-        btn.setAttribute('aria-label', isPaused ? 'Resume auto scroll' : 'Pause auto scroll');
-
-        // Swap icon (lucide)
-        btn.innerHTML = `<i data-lucide="${isPaused ? 'play' : 'pause'}"></i>`;
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
+        // Auto advance button removed - functionality still works automatically
+        // This method is kept for compatibility but does nothing
     }
 
     stopAutoAdvance() {
@@ -562,6 +599,8 @@ class DialoguePage {
         const nextConversationBtn = document.getElementById('next-conversation-btn');
         const prevLineBtn = document.getElementById('prev-line-btn');
         const nextLineBtn = document.getElementById('next-line-btn');
+        const prevLineBtnControl = document.getElementById('prev-line-btn-control');
+        const nextLineBtnControl = document.getElementById('next-line-btn-control');
 
         // Conversation navigation
         if (prevConversationBtn) {
@@ -572,16 +611,21 @@ class DialoguePage {
             nextConversationBtn.disabled = this.currentConversationIndex >= this.modifiedDialogue.length - 1;
         }
 
-        // Line navigation
-        if (prevLineBtn) {
-            prevLineBtn.disabled = this.currentLineIndex <= 0;
-        }
-        
-        if (nextLineBtn && this.currentConversationIndex < this.modifiedDialogue.length) {
-            const conversation = this.modifiedDialogue[this.currentConversationIndex];
-            const lines = conversation.split('\n');
-            nextLineBtn.disabled = this.currentLineIndex >= lines.length - 1;
-        }
+        // Line navigation - update both sets of buttons
+        const updateLineButtons = (prevBtn, nextBtn) => {
+            if (prevBtn) {
+                prevBtn.disabled = this.currentLineIndex <= 0;
+            }
+            
+            if (nextBtn && this.currentConversationIndex < this.modifiedDialogue.length) {
+                const conversation = this.modifiedDialogue[this.currentConversationIndex];
+                const lines = conversation.split('\n');
+                nextBtn.disabled = this.currentLineIndex >= lines.length - 1;
+            }
+        };
+
+        updateLineButtons(prevLineBtn, nextLineBtn);
+        updateLineButtons(prevLineBtnControl, nextLineBtnControl);
     }
 
     setLoading(loading) {
