@@ -145,10 +145,14 @@
             Language Learning - <span id="current-language">English</span>
           </h1>
 
+
+
           <!-- Conversation Selector -->
-          <select class="conversation-selector" id="conversation-selector">
-            <option value="0">Select Conversation</option>
-          </select>
+          <div class="conversation-select-row">
+            <select class="conversation-selector" id="conversation-selector">
+              <option value="0">Select Conversation</option>
+            </select>
+          </div>
 
           <!-- Speed Control -->
           <div class="speed-control" id="speed-control">
@@ -164,7 +168,12 @@
             />
             <span id="speed-value" class="speed-value">3.0s</span>
           </div>
-
+                  <!-- Current Conversation Heading -->
+                  <div
+                  class="conversation-heading notranslate"
+                  id="conversation-heading"
+                  aria-live="polite"
+                ></div>
           <!-- Conversation Block with Navigation Buttons -->
           <div class="conversation-block">
             <!-- Navigation Buttons on the right side -->
