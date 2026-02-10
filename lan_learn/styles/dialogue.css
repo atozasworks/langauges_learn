@@ -169,7 +169,8 @@
 /* Conversation Block */
 .conversation-block {
     position: relative;
-    height: 55vh;
+    height: auto;
+    max-height: 55vh;
     width: 90%;
     max-width: 800px;
     background-color: #fff;
@@ -195,7 +196,7 @@
     color: #fff;
     padding: 10px;
     border-radius: 4px;
-    margin: 5px 0;
+    margin: 0;
     font-size: 1.4em;
     box-shadow: 0 4px 8px rgba(108, 105, 105, 0.2);
     transform: scale(0.9);
@@ -203,8 +204,18 @@
     white-space: normal;
     word-wrap: break-word;
     max-width: fit-content;
-    display: inline-block;
+    display: block;
     z-index: 999;
+}
+
+/* Remove default margins on lines inside the script text */
+.script-text > div {
+    margin: 0;
+}
+
+/* Add a subtle separation only to the next line below the highlighted line */
+.script-text > div + div {
+    margin-top: 2px;
 }
 
 .highlighted-line .learner-name {
@@ -400,7 +411,8 @@
     }
     
     .conversation-block {
-        height: 50vh;
+        height: auto;
+        max-height: 50vh;
         padding: 15px;
         padding-right: 70px; /* Adjust space for navigation buttons on mobile */
         width: 95%;
@@ -505,7 +517,8 @@
     }
     
     .conversation-block {
-        height: 40vh;
+        height: auto;
+        max-height: 40vh;
         padding: 10px;
         padding-right: 50px; /* Adjust space for navigation buttons on smaller screens */
     }
