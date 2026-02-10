@@ -422,10 +422,7 @@ class DialoguePage {
             selector.value = index;
         }
 
-        // Display the conversation
-        this.displayConversation();
-        
-        // Set current line to first learner line
+        // Set current line to first learner line, then display
         this.setFirstLearnerLine();
 
         // Auto-advance: first line should stay longer (6s) for every new conversation
@@ -450,28 +447,31 @@ class DialoguePage {
 
     renderHighlightedDialogue(dialogue) {
         const lines = dialogue.split('\n');
-        return lines.map((line, index) => {
-            const isHighlighted = index === this.currentLineIndex;
-            const trimmedLine = line.trim();
-            
-            // Detect "Conversation X" lines (smaller font)
-            const isConversationNumber = trimmedLine.startsWith('Conversation ') && /^Conversation \d+/.test(trimmedLine);
-            
-            // Detect "Basic Introduction and Greetings" type titles (larger font, bold, underline)
-            const isConversationTitle = trimmedLine.includes('Basic Introduction') || 
-                                       (trimmedLine !== '' && !trimmedLine.includes(':') && 
-                                        !isConversationNumber && trimmedLine.length > 10 && 
-                                        !trimmedLine.match(/^Person \d+:/));
-            
-            let className = isHighlighted ? 'highlighted-line' : '';
-            if (isConversationNumber) {
-                className = className ? `${className} conversation-number` : 'conversation-number';
-            } else if (isConversationTitle) {
-                className = className ? `${className} conversation-title` : 'conversation-title';
+        // Determine which indices to show: current and next
+        let currentIndex = this.currentLineIndex;
+        if (currentIndex < 0) {
+            // Fallback to first learner line if not set
+            const firstLearnerLineIndex = lines.findIndex(l => l.includes('learner-name'));
+            currentIndex = firstLearnerLineIndex >= 0 ? firstLearnerLineIndex : 0;
+        }
+
+        // Find the next non-empty line after current
+        let nextIndex = -1;
+        for (let i = currentIndex + 1; i < lines.length; i++) {
+            if (String(lines[i]).trim() !== '') {
+                nextIndex = i;
+                break;
             }
-            
+        }
+
+        const visibleIndices = [currentIndex];
+        if (nextIndex !== -1) visibleIndices.push(nextIndex);
+
+        return visibleIndices.map((index) => {
+            const line = lines[index];
+            const isHighlighted = index === currentIndex;
+            const className = isHighlighted ? 'highlighted-line' : '';
             const id = isHighlighted ? 'highlighted-line' : '';
-            
             return `<div class="${className}" id="${id}">${line}</div>`;
         }).join('');
     }
