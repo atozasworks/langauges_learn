@@ -407,6 +407,38 @@ class DialoguePage {
         });
     }
 
+    updateConversationHeading() {
+        const headingEl = document.getElementById('conversation-heading');
+        if (!headingEl) return;
+
+        headingEl.replaceChildren();
+
+        if (this.currentConversationIndex < 0 || this.currentConversationIndex >= this.modifiedDialogue.length) {
+            return;
+        }
+
+        const conversation = this.modifiedDialogue[this.currentConversationIndex];
+        const lines = String(conversation || '').split('\n');
+
+        // Conversation heading lines are expected to be before the first learner line
+        const firstLearnerLineIndex = lines.findIndex(line => String(line).includes('learner-name'));
+        const headerLines = (firstLearnerLineIndex > 0 ? lines.slice(0, firstLearnerLineIndex) : lines.slice(0, 2))
+            .map(l => String(l).trim())
+            .filter(Boolean);
+
+        // Show ONLY the title (ex: "At Hospital / Clinic"), not the "Conversation X" line
+        const titleLine =
+            headerLines.find(l => !l.includes('Conversation') && !l.includes(':') && !l.includes('learner-name')) ||
+            `Conversation ${this.currentConversationIndex + 1}`;
+
+        if (titleLine) {
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'conversation-title';
+            titleDiv.textContent = titleLine;
+            headingEl.appendChild(titleDiv);
+        }
+    }
+
     setCurrentConversation(index) {
         if (index < 0 || index >= this.modifiedDialogue.length) {
             return;
@@ -422,10 +454,9 @@ class DialoguePage {
             selector.value = index;
         }
 
-        // Display the conversation
-        this.displayConversation();
-        
-        // Set current line to first learner line
+        this.updateConversationHeading();
+
+        // Set current line to first learner line, then display
         this.setFirstLearnerLine();
 
         // Auto-advance: first line should stay longer (6s) for every new conversation
@@ -450,26 +481,30 @@ class DialoguePage {
 
     renderHighlightedDialogue(dialogue) {
         const lines = dialogue.split('\n');
-        return lines.map((line, index) => {
-            const isHighlighted = index === this.currentLineIndex;
-            const trimmedLine = line.trim();
-            
-            // Detect "Conversation X" lines (smaller font)
-            const isConversationNumber = trimmedLine.startsWith('Conversation ') && /^Conversation \d+/.test(trimmedLine);
-            
-            // Detect "Basic Introduction and Greetings" type titles (larger font, bold, underline)
-            const isConversationTitle = trimmedLine.includes('Basic Introduction') || 
-                                       (trimmedLine !== '' && !trimmedLine.includes(':') && 
-                                        !isConversationNumber && trimmedLine.length > 10 && 
-                                        !trimmedLine.match(/^Person \d+:/));
-            
-            let className = isHighlighted ? 'highlighted-line' : '';
-            if (isConversationNumber) {
-                className = className ? `${className} conversation-number` : 'conversation-number';
-            } else if (isConversationTitle) {
-                className = className ? `${className} conversation-title` : 'conversation-title';
+        // Determine which indices to show: current and next
+        let currentIndex = this.currentLineIndex;
+        if (currentIndex < 0) {
+            // Fallback to first learner line if not set
+            const firstLearnerLineIndex = lines.findIndex(l => l.includes('learner-name'));
+            currentIndex = firstLearnerLineIndex >= 0 ? firstLearnerLineIndex : 0;
+        }
+
+        // Find the next non-empty line after current
+        let nextIndex = -1;
+        for (let i = currentIndex + 1; i < lines.length; i++) {
+            if (String(lines[i]).trim() !== '') {
+                nextIndex = i;
+                break;
             }
-            
+        }
+
+        const visibleIndices = [currentIndex];
+        if (nextIndex !== -1) visibleIndices.push(nextIndex);
+
+        return visibleIndices.map((index) => {
+            const line = lines[index];
+            const isHighlighted = index === currentIndex;
+            const className = isHighlighted ? 'highlighted-line' : '';
             const id = isHighlighted ? 'highlighted-line' : '';
             
             // For non-highlighted lines, remove the learner-name span to hide names
@@ -554,14 +589,35 @@ class DialoguePage {
         }
     }
 
-    scrollToHighlightedLine() {
+    scrollToHighlightedLine(options = {}) {
         const highlightedLine = document.getElementById('highlighted-line');
-        if (highlightedLine) {
-            highlightedLine.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center'
-            });
+        if (!highlightedLine) return;
+
+        const behavior = options.behavior || 'smooth';
+
+        // Prefer scrolling only inside the conversation panel (avoid page scroll)
+        const container = highlightedLine.closest('.conversation-block');
+        if (container) {
+            const containerRect = container.getBoundingClientRect();
+            const lineRect = highlightedLine.getBoundingClientRect();
+
+            // Distance of the line from the top of the container's visible area
+            const lineOffsetInContainer = (lineRect.top - containerRect.top);
+
+            // Center the highlighted line within the container
+            const targetTop =
+                container.scrollTop +
+                lineOffsetInContainer -
+                (containerRect.height / 2) +
+                (lineRect.height / 2);
+
+            const clampedTop = Math.max(0, Math.min(targetTop, container.scrollHeight - containerRect.height));
+            container.scrollTo({ top: clampedTop, behavior });
+            return;
         }
+
+        // Fallback (should rarely happen)
+        highlightedLine.scrollIntoView({ behavior, block: 'center' });
     }
 
     updateNavigationButtons() {
@@ -594,16 +650,22 @@ class DialoguePage {
     setLoading(loading) {
         this.isLoading = loading;
         const scriptText = document.getElementById('script-text');
+        const headingEl = document.getElementById('conversation-heading');
         
         if (scriptText) {
             if (loading) {
                 scriptText.innerHTML = '<div class="loading">Loading dialogue...</div>';
             }
         }
+
+        if (headingEl && loading) {
+            headingEl.replaceChildren();
+        }
     }
 
     showError(message) {
         const scriptText = document.getElementById('script-text');
+        const headingEl = document.getElementById('conversation-heading');
         if (scriptText) {
             scriptText.innerHTML = `
                 <div style="text-align: center; color: #ef4444; padding: 2rem;">
@@ -614,6 +676,10 @@ class DialoguePage {
                     </p>
                 </div>
             `;
+        }
+
+        if (headingEl) {
+            headingEl.replaceChildren();
         }
     }
 
