@@ -506,7 +506,15 @@ class DialoguePage {
             const isHighlighted = index === currentIndex;
             const className = isHighlighted ? 'highlighted-line' : '';
             const id = isHighlighted ? 'highlighted-line' : '';
-            return `<div class="${className}" id="${id}">${line}</div>`;
+            
+            // For non-highlighted lines, remove the learner-name span to hide names
+            let processedLine = line;
+            if (!isHighlighted) {
+                // Remove learner-name spans from non-highlighted lines (handles nested tags)
+                processedLine = processedLine.replace(/<span class="learner-name">[\s\S]*?<\/span>:/g, '');
+            }
+            
+            return `<div class="${className}" id="${id}">${processedLine}</div>`;
         }).join('');
     }
 
