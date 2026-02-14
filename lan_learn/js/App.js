@@ -170,14 +170,6 @@ class GTongueLearnApp {
         // Pause auto-advance when leaving Dialogue page
         if (previousPage === 'dialogue' && pageId !== 'dialogue') {
             window.dialoguePage?.stopAutoAdvance?.();
-            // Stop and hide timer when leaving dialogue page
-            if (window.learningTimer) {
-                window.learningTimer.stop();
-                const timerContainer = document.getElementById('timer-container');
-                if (timerContainer) {
-                    timerContainer.style.display = 'none';
-                }
-            }
         }
 
         // Hide all pages
@@ -333,11 +325,6 @@ let app;
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     app = new GTongueLearnApp();
-    
-    // Initialize timer
-    if (typeof LearningTimer !== 'undefined') {
-        window.learningTimer = new LearningTimer();
-    }
     
     // Initialize other modules
     if (typeof LearnHome !== 'undefined') {
