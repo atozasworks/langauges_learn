@@ -1,23 +1,42 @@
 /* Dialogue Page Styles */
+#dialogue-page {
+    overflow: hidden !important;
+    height: 100vh;
+    max-height: 100vh;
+    position: fixed;
+    width: 100%;
+    top: 0;
+    left: 0;
+}
+
 .dialogue-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: calc(100vh - 80px);
-    padding: 20px;
+    height: calc(100vh - 80px);
+    max-height: calc(100vh - 80px);
+    overflow: visible;
+    padding: 10px 20px;
+    padding-top: 60px; /* Space for title and buttons */
+    padding-bottom: 80px; /* Space for fixed buttons */
     box-sizing: border-box;
     position: relative;
     max-width: 1200px;
     margin: 0 auto;
+    justify-content: flex-start;
 }
 
 /* Page Title */
 .page-title {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     font-weight: bold;
     color: #333;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
+    margin-top: 0;
     text-align: center;
+    position: relative;
+    z-index: 1;
+    width: 100%;
 }
 
 /* Navigation Buttons Container */
@@ -74,21 +93,23 @@
 
 /* Go Back Button */
 .go-back-button {
-    position: absolute;
-    top: 1em;
-    left: 0.5em;
-    background-color: transparent !important;
-    color: black;
+    position: fixed;
+    top: 90px;
+    left: 20px;
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    color: black !important;
     cursor: pointer;
-    border: none;
+    border: 1px solid rgba(0, 0, 0, 0.1);
     padding: 10px;
     border-radius: 50%;
     width: 40px;
     height: 40px;
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
     transition: background-color 0.3s ease;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .go-back-button:hover {
@@ -113,6 +134,7 @@
     align-items: center;
     justify-content: center;
     transition: background-color 0.3s ease;
+    z-index: 1000;
 }
 
 .about-page-button:hover {
@@ -120,16 +142,29 @@
     font-weight: bold;
 }
 
+/* Controls Container */
+.controls-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 10px;
+    margin-top: 0;
+    width: 100%;
+    flex-wrap: wrap;
+}
+
 /* Conversation Selector */
 .conversation-selector {
     width: 200px;
-    padding: 10px;
-    font-size: 1rem;
+    padding: 8px;
+    font-size: 0.95rem;
     border: 2px solid #ffcc00;
     border-radius: 8px;
     background-color: #fffbe6;
     color: #333;
-    margin-bottom: 20px;
+    margin-bottom: 0;
     cursor: pointer;
 }
 
@@ -141,9 +176,9 @@
 .speed-control {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 16px;
-    padding: 8px 12px;
+    gap: 8px;
+    margin-bottom: 0;
+    padding: 6px 10px;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
@@ -169,16 +204,19 @@
 /* Conversation Block */
 .conversation-block {
     position: relative;
-    height: 55vh;
-    width: 90%;
-    max-width: 800px;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    max-width: 1400px;
     background-color: #fff;
-    padding: 20px;
+    padding: 15px;
     padding-right: 80px; /* Add space for navigation buttons */
     border-radius: 12px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     overflow-y: auto;
-    margin-bottom: 20px;
+    margin-top: 10px;
+    margin-bottom: -40px;
+    flex-shrink: 0;
 }
 
 .script-text {
@@ -207,13 +245,44 @@
     z-index: 999;
 }
 
-.highlighted-line .learner-name {
-    color: #ff6b6b !important;
-    font-weight: bold;
+/* Blinking yellow animation for active name */
+@keyframes blink-yellow {
+    0% {
+        color: #ffd700;
+        text-shadow: 0 0 5px #ffd700;
+    }
+    50% {
+        color: #ffff00;
+        text-shadow: 0 0 10px #ffff00, 0 0 20px #ffff00;
+    }
+    100% {
+        color: #ffd700;
+        text-shadow: 0 0 5px #ffd700;
+    }
 }
 
-.highlighted-line .learner-name strong {
-    color: #ff6b6b !important;
+@-webkit-keyframes blink-yellow {
+    0% {
+        color: #ffd700;
+        text-shadow: 0 0 5px #ffd700;
+    }
+    50% {
+        color: #ffff00;
+        text-shadow: 0 0 10px #ffff00, 0 0 20px #ffff00;
+    }
+    100% {
+        color: #ffd700;
+        text-shadow: 0 0 5px #ffd700;
+    }
+}
+
+.highlighted-line .learner-name,
+.highlighted-line .learner-name * {
+    font-weight: bold !important;
+    animation: blink-yellow 1s ease-in-out infinite !important;
+    -webkit-animation: blink-yellow 1s ease-in-out infinite !important;
+    -moz-animation: blink-yellow 1s ease-in-out infinite !important;
+    -o-animation: blink-yellow 1s ease-in-out infinite !important;
 }
 
 .highlighted-line .conversation-text {
@@ -261,12 +330,19 @@
 
 /* Button Container */
 .button-con {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     flex-direction: row;
     gap: 10px;
     justify-content: center;
-    margin-top: 20px;
-    margin-bottom: 100px;
+    z-index: 100;
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 10px 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .button-con button {
