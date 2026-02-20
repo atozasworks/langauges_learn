@@ -10,6 +10,7 @@ class LearnHome {
     async init() {
         await this.loadLearners();
         this.setupEventListeners();
+        this.initializeLearningLevelSelector();
         this.initializeDataTable();
         this.updateCounts();
         // Update select-all checkbox after initialization
@@ -200,15 +201,55 @@ class LearnHome {
             return;
         }
 
+        const generationPreferences = this.collectGenerationPreferences();
+        if (!generationPreferences) {
+            return;
+        }
+
         // Navigate to dialogue page
         if (app) {
             app.showPage('dialogue');
             
             // Initialize dialogue page with selected learners
             if (window.dialoguePage) {
-                window.dialoguePage.initializeWithLearners(this.getSelectedLearnerNames());
+                window.dialoguePage.initializeWithLearners(this.getSelectedLearnerNames(), generationPreferences);
             }
         }
+    }
+
+    collectGenerationPreferences() {
+        const levelSelector = document.getElementById('learning-level-select');
+        const selectedValue = (levelSelector?.value || '').trim().toLowerCase();
+        const normalizedLevel = selectedValue;
+
+        if (!['beginner', 'medium', 'advanced'].includes(normalizedLevel)) {
+            Utils.showToast('Invalid level. Use beginner, medium, or advanced.', 'warning');
+            return null;
+        }
+
+        Utils.saveToStorage('dialogueLearningLevel', normalizedLevel);
+
+        return {
+            level: normalizedLevel,
+            locationMode: 'auto'
+        };
+    }
+
+    initializeLearningLevelSelector() {
+        const levelSelector = document.getElementById('learning-level-select');
+        if (!levelSelector) return;
+
+        const savedLevel = (Utils.getFromStorage('dialogueLearningLevel', 'beginner') || 'beginner').toLowerCase();
+        const allowed = ['beginner', 'medium', 'advanced'];
+        const initialValue = allowed.includes(savedLevel) ? savedLevel : 'beginner';
+        levelSelector.value = initialValue;
+
+        levelSelector.addEventListener('change', () => {
+            const value = (levelSelector.value || '').toLowerCase();
+            if (allowed.includes(value)) {
+                Utils.saveToStorage('dialogueLearningLevel', value);
+            }
+        });
     }
 
     getSelectedLearnerNames() {

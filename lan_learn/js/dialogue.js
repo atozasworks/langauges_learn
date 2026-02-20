@@ -8,6 +8,12 @@ class DialoguePage {
         this.currentLineIndex = -1;
         this.isLoading = false;
         this.currentLanguage = 'English';
+        this.groqService = typeof GroqDialogueService !== 'undefined' ? new GroqDialogueService() : null;
+        this.generationPreferences = {
+            level: 'beginner',
+            locationMode: 'auto',
+            manualLocation: ''
+        };
 
         // Auto-advance (dialog-to-dialog) settings
         this.autoAdvanceEnabled = true;
@@ -209,8 +215,15 @@ class DialoguePage {
                this.currentConversationIndex < this.modifiedDialogue.length - 1;
     }
 
-    async initializeWithLearners(learnerNames) {
+    async initializeWithLearners(learnerNames, generationPreferences = null) {
         this.learnerNames = learnerNames || [];
+        if (generationPreferences && typeof generationPreferences === 'object') {
+            this.generationPreferences = {
+                ...this.generationPreferences,
+                ...generationPreferences
+            };
+        }
+
         if (this.learnerNames.length === 0) {
             this.showError('No learners selected. Please go back and select learners.');
             return;
@@ -223,15 +236,10 @@ class DialoguePage {
         this.setLoading(true);
         
         try {
-            // Use embedded dialogue data instead of fetching files
-            if (typeof getDialogueForLanguage === 'undefined') {
-                throw new Error('Dialogue data not loaded. Please ensure dialogue-data.js is included.');
-            }
-            
-            const dialogueText = getDialogueForLanguage(this.currentLanguage);
+            const dialogueText = await this.generateLocationAwareDialogue();
             
             if (!dialogueText || dialogueText.trim() === '') {
-                throw new Error(`No dialogue content found for language: ${this.currentLanguage}`);
+                throw new Error('No generated dialogue content was returned.');
             }
 
             this.originalDialogue = dialogueText;
@@ -245,7 +253,7 @@ class DialoguePage {
             
         } catch (error) {
             console.error('Error loading dialogue:', error);
-            this.showError(`Failed to load dialogue script for ${this.currentLanguage}. Available languages: ${getAvailableLanguages().join(', ')}`);
+            this.showError(`Failed to generate dialogue script for ${this.currentLanguage}. ${error.message || ''}`);
             
             // Navigate back to home after a delay
             setTimeout(() => {
@@ -256,6 +264,33 @@ class DialoguePage {
         } finally {
             this.setLoading(false);
         }
+    }
+
+    async generateLocationAwareDialogue() {
+        if (!this.groqService) {
+            throw new Error('Groq dialogue service is not available.');
+        }
+
+        const apiKey = await this.groqService.ensureApiKey();
+        const locationContext = await this.groqService.getLocationContext(this.generationPreferences);
+
+        const translationService = window.app?.translationService;
+        const languageCode = translationService?.getCurrentLanguage?.() || 'en';
+        const supportedLanguages = translationService?.getSupportedLanguages?.() || { en: 'English' };
+        const languageName = supportedLanguages[languageCode] || 'English';
+
+        const level = (this.generationPreferences.level || 'beginner').toLowerCase();
+        const normalizedLevel = ['beginner', 'medium', 'advanced'].includes(level) ? level : 'beginner';
+
+        const conversations = await this.groqService.generateDialogues({
+            apiKey,
+            level: normalizedLevel,
+            languageName,
+            languageCode,
+            locationLabel: locationContext.locationLabel
+        });
+
+        return this.groqService.toDialogueText(conversations);
     }
 
     async applyTranslation() {
