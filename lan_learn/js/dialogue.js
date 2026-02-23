@@ -70,6 +70,13 @@ class DialoguePage {
                 this.setAutoAdvanceSpeed(value);
             });
         }
+
+        // Sidebar add member button functionality
+        const sidebarAddMemberBtn = document.getElementById('sidebar-add-member-btn');
+        
+        if (sidebarAddMemberBtn) {
+            sidebarAddMemberBtn.addEventListener('click', () => this.openAddMemberPopup());
+        }
     }
 
     _initSpeedSlider(speedSlider) {
@@ -168,16 +175,58 @@ class DialoguePage {
 
     _scheduleAutoAdvance(delayMs) {
         if (!this.autoAdvanceEnabled) return;
+        
+        // Check if learning session has ended
+        if (window.learnHomeInstance && window.learnHomeInstance.isSessionEnded()) {
+            console.log('Session ended, not scheduling auto-advance');
+            return;
+        }
+        
+        // Calculate additional time based on word length
+        const adjustedDelay = this._calculateAdjustedDelay(delayMs);
+        
         this.stopAutoAdvance();
         this.autoAdvanceTimeoutId = setTimeout(() => {
             this.autoAdvanceTimeoutId = null;
             this._autoAdvanceTick();
-        }, delayMs);
+        }, adjustedDelay);
+    }
+
+    _calculateAdjustedDelay(baseDelayMs) {
+        // Get the current line text
+        if (this.currentConversationIndex >= this.modifiedDialogue.length || this.currentLineIndex < 0) {
+            return baseDelayMs;
+        }
+
+        const conversation = this.modifiedDialogue[this.currentConversationIndex];
+        const lines = conversation.split('\n');
+        const currentLine = lines[this.currentLineIndex] || '';
+
+        // Extract text content (remove HTML tags)
+        const textContent = currentLine.replace(/<[^>]*>/g, '').trim();
+
+        // Split into words and check for long words (5+ characters)
+        const words = textContent.split(/\s+/).filter(word => word.length > 0);
+        const longWords = words.filter(word => word.length >= 5);
+
+        // If there are 4 or more long words, add 3 seconds (3000ms) to the base delay
+        if (longWords.length >= 4) {
+            return baseDelayMs + 3000;
+        }
+
+        return baseDelayMs;
     }
 
     _autoAdvanceTick() {
         if (!this.autoAdvanceEnabled) return;
         if (this.isLoading) return;
+
+        // Check if learning session has ended
+        if (window.learnHomeInstance && window.learnHomeInstance.isSessionEnded()) {
+            console.log('Session ended, stopping auto-advance');
+            this.stopAutoAdvance();
+            return;
+        }
 
         const didAdvance = this.nextLine({ fromAutoAdvance: true });
         if (didAdvance) {
@@ -209,14 +258,232 @@ class DialoguePage {
                this.currentConversationIndex < this.modifiedDialogue.length - 1;
     }
 
-    async initializeWithLearners(learnerNames) {
+    async initializeWithLearners(learnerNames, isGroupMode = false) {
         this.learnerNames = learnerNames || [];
+        this.isGroupMode = isGroupMode;
+        this.isAIMode = false;
+        
         if (this.learnerNames.length === 0) {
             this.showError('No learners selected. Please go back and select learners.');
             return;
         }
 
+        // Show/hide and populate the learners sidebar based on mode
+        this.handleLearnersSidebar();
+
         await this.loadDialogue();
+    }
+
+    async initializeWithAIMode(learnerNames) {
+        this.learnerNames = learnerNames || ['AI Assistant'];
+        this.isGroupMode = false;
+        this.isAIMode = true;
+        
+        // Hide the learners sidebar for AI mode
+        const sidebar = document.getElementById('learners-sidebar');
+        if (sidebar) {
+            sidebar.style.display = 'none';
+        }
+
+        // Update the page title to indicate AI mode
+        const currentLanguageSpan = document.getElementById('current-language');
+        if (currentLanguageSpan) {
+            currentLanguageSpan.textContent = 'English (AI Enhanced)';
+        }
+
+        // Show AI topic selector instead of regular conversation selector
+        await this.setupAITopicSelector();
+
+        // Initialize with the first topic
+        await this.loadAIDialogue();
+    }
+
+    handleLearnersSidebar() {
+        const sidebar = document.getElementById('learners-sidebar');
+        
+        if (!sidebar) return;
+
+        if (this.isGroupMode) {
+            // Show sidebar for group mode
+            sidebar.style.display = 'block';
+            this.populateLearnersSidebar();
+        } else {
+            // Hide sidebar for regular learning mode
+            sidebar.style.display = 'none';
+        }
+    }
+
+    populateLearnersSidebar() {
+        const learnersList = document.getElementById('learners-list');
+        if (!learnersList) return;
+
+        // Clear existing list
+        learnersList.innerHTML = '';
+
+        // Add each learner to the list
+        this.learnerNames.forEach(name => {
+            const li = document.createElement('li');
+            li.textContent = name;
+            li.className = 'learner-item';
+            learnersList.appendChild(li);
+        });
+    }
+
+    openAddMemberPopup() {
+        // Get access to learnHomeInstance
+        if (!window.learnHomeInstance) {
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Unable to access learner list', 'error');
+            }
+            return;
+        }
+
+        const learnHome = window.learnHomeInstance;
+        
+        // Populate the group selection popup with all learners
+        const groupMembersList = document.getElementById('group-members-list');
+        if (!groupMembersList) return;
+
+        // Clear existing list
+        groupMembersList.innerHTML = '';
+
+        // Get current learner IDs for comparison
+        const currentLearnerIds = this.learnerNames.map(name => {
+            const learner = learnHome.learners.find(l => l.name === name);
+            return learner ? learner.id : null;
+        }).filter(id => id !== null);
+
+        // Add each learner to the popup with checkbox
+        learnHome.learners.forEach(learner => {
+            const memberDiv = document.createElement('div');
+            memberDiv.style.cssText = 'display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #e5e7eb;';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'group-member-checkbox';
+            checkbox.id = `sidebar-member-${learner.id}`;
+            checkbox.dataset.id = learner.id;
+            checkbox.dataset.name = learner.name;
+            checkbox.style.cssText = 'margin-right: 10px; cursor: pointer; width: 18px; height: 18px;';
+            
+            // Check if this learner is already in the current dialogue
+            checkbox.checked = currentLearnerIds.includes(learner.id);
+            
+            const label = document.createElement('label');
+            label.htmlFor = `sidebar-member-${learner.id}`;
+            label.textContent = learner.name;
+            label.style.cssText = 'cursor: pointer; flex: 1; font-size: 1rem;';
+            
+            memberDiv.appendChild(checkbox);
+            memberDiv.appendChild(label);
+            groupMembersList.appendChild(memberDiv);
+        });
+
+        // Update the selected count
+        this.updateSidebarGroupCount();
+
+        // Update select all checkbox
+        this.updateSidebarSelectAllCheckbox();
+
+        // Setup event listeners for checkboxes
+        const checkboxes = document.querySelectorAll('.group-member-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                this.updateSidebarGroupCount();
+                this.updateSidebarSelectAllCheckbox();
+            });
+        });
+
+        // Setup select all checkbox
+        const selectAllCheckbox = document.getElementById('group-select-all');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', (e) => {
+                checkboxes.forEach(cb => {
+                    cb.checked = e.target.checked;
+                });
+                this.updateSidebarGroupCount();
+            });
+        }
+
+        // Override the confirm button to use our method
+        const groupStartBtn = document.getElementById('group-start-btn');
+        if (groupStartBtn) {
+            // Remove existing listeners by cloning
+            const newGroupStartBtn = groupStartBtn.cloneNode(true);
+            groupStartBtn.parentNode.replaceChild(newGroupStartBtn, groupStartBtn);
+            
+            newGroupStartBtn.addEventListener('click', () => this.confirmSidebarMemberSelection());
+        }
+
+        // Show the popup
+        if (typeof Utils !== 'undefined' && Utils.showPopup) {
+            Utils.showPopup('group-selection-popup');
+        }
+
+        // Re-initialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    updateSidebarGroupCount() {
+        const checkboxes = document.querySelectorAll('.group-member-checkbox:checked');
+        const countElement = document.getElementById('group-selected-count');
+        if (countElement) {
+            countElement.textContent = `${checkboxes.length} selected`;
+        }
+    }
+
+    updateSidebarSelectAllCheckbox() {
+        const allCheckboxes = document.querySelectorAll('.group-member-checkbox');
+        const checkedCheckboxes = document.querySelectorAll('.group-member-checkbox:checked');
+        const selectAllCheckbox = document.getElementById('group-select-all');
+        
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = allCheckboxes.length > 0 && 
+                                       allCheckboxes.length === checkedCheckboxes.length;
+        }
+    }
+
+    confirmSidebarMemberSelection() {
+        const checkboxes = document.querySelectorAll('.group-member-checkbox:checked');
+        
+        if (checkboxes.length === 0) {
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Please select at least one member', 'warning');
+            }
+            return;
+        }
+
+        // Get selected learner names
+        const selectedNames = Array.from(checkboxes).map(cb => cb.dataset.name);
+
+        // Update learner names array
+        this.learnerNames = selectedNames;
+
+        // Reprocess the dialogue with the new learners
+        this.processDialogue();
+        
+        // Refresh the current conversation display
+        this.setCurrentConversation(this.currentConversationIndex);
+        
+        // Update the sidebar display
+        this.populateLearnersSidebar();
+
+        // Hide the popup
+        if (typeof Utils !== 'undefined' && Utils.hidePopup) {
+            Utils.hidePopup('group-selection-popup');
+        }
+
+        // Show success message
+        if (typeof Utils !== 'undefined' && Utils.showToast) {
+            Utils.showToast(`Members updated successfully! (${checkboxes.length} selected)`, 'success');
+        }
+
+        // Re-initialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
 
     async loadDialogue() {
@@ -549,10 +816,20 @@ class DialoguePage {
 
     scrollToHighlightedLine() {
         const highlightedLine = document.getElementById('highlighted-line');
-        if (highlightedLine) {
-            highlightedLine.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center'
+        const conversationBlock = document.querySelector('.conversation-block');
+        
+        if (highlightedLine && conversationBlock) {
+            // Calculate the position of the highlighted line relative to the conversation block
+            const lineTop = highlightedLine.offsetTop;
+            const lineHeight = highlightedLine.offsetHeight;
+            const containerHeight = conversationBlock.clientHeight;
+            
+            // Scroll to center the highlighted line within the conversation block
+            const scrollPosition = lineTop - (containerHeight / 2) + (lineHeight / 2);
+            
+            conversationBlock.scrollTo({
+                top: scrollPosition,
+                behavior: 'smooth'
             });
         }
     }
@@ -584,13 +861,13 @@ class DialoguePage {
         }
     }
 
-    setLoading(loading) {
+    setLoading(loading, message = 'Loading dialogue...') {
         this.isLoading = loading;
         const scriptText = document.getElementById('script-text');
         
         if (scriptText) {
             if (loading) {
-                scriptText.innerHTML = '<div class="loading">Loading dialogue...</div>';
+                scriptText.innerHTML = `<div class="loading">${message}</div>`;
             }
         }
     }
@@ -607,6 +884,168 @@ class DialoguePage {
                     </p>
                 </div>
             `;
+        }
+    }
+
+    // AI Methods
+    async setupAITopicSelector() {
+        const conversationSelector = document.getElementById('conversation-selector');
+        if (!conversationSelector) return;
+
+        // Clear existing options
+        conversationSelector.innerHTML = '';
+
+        // Add default option
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Select AI Topic...';
+        conversationSelector.appendChild(defaultOption);
+
+        // Get available topics from AI service
+        const topics = window.aiDialogueService ? 
+            window.aiDialogueService.getAvailableTopics() : 
+            [
+                'Daily Routines',
+                'Food and Dining', 
+                'Travel and Transportation',
+                'Work and Career',
+                'Family and Relationships'
+            ];
+
+        // Populate with AI topics
+        topics.forEach((topic, index) => {
+            const option = document.createElement('option');
+            option.value = `ai-topic-${index}`;
+            option.dataset.topic = topic;
+            option.textContent = `AI: ${topic}`;
+            conversationSelector.appendChild(option);
+        });
+
+        // Update event listener for AI mode
+        conversationSelector.removeEventListener('change', this.originalChangeHandler);
+        conversationSelector.addEventListener('change', (e) => {
+            if (e.target.value.startsWith('ai-topic-')) {
+                const topic = e.target.options[e.target.selectedIndex].dataset.topic;
+                this.generateAIDialogue(topic);
+            }
+        });
+    }
+
+    async loadAIDialogue() {
+        this.setLoading(true, 'Initializing AI dialogue system...');
+        
+        try {
+            if (!window.aiDialogueService) {
+                throw new Error('AI service not loaded. Please ensure ai-dialogue-service.js is included.');
+            }
+
+            // Check if API key is configured
+            if (!window.aiDialogueService.isConfigured()) {
+                const apiKeySet = await window.aiDialogueService.showApiKeyDialog();
+                if (!apiKeySet) {
+                    throw new Error('GROQ API key required for AI features. Please configure your API key.');
+                }
+            }
+
+            // Start with a default topic if none selected
+            const defaultTopic = 'Basic Introduction and Greetings';
+            await this.generateAIDialogue(defaultTopic);
+            
+        } catch (error) {
+            console.error('Error initializing AI dialogue:', error);
+            this.showError(`Failed to initialize AI dialogue: ${error.message}. You can still use regular dialogues.`);
+            
+            // Navigate back to home after a delay
+            setTimeout(() => {
+                if (app) {
+                    app.showPage('home');
+                }
+            }, 5000);
+        } finally {
+            this.setLoading(false);
+        }
+    }
+
+    async generateAIDialogue(topic) {
+        this.setLoading(true, `Generating AI dialogue about "${topic}"...`);
+        
+        try {
+            // Get a base dialogue from the existing data to enhance
+            let baseDialogue = this.getRandomBaseDialogue();
+            
+            // Generate enhanced dialogue using AI
+            const context = {
+                language: this.currentLanguage || 'English',
+                learnerLevel: 'intermediate',   // Could be made configurable
+                focusArea: topic
+            };
+
+            let aiDialogue;
+            if (baseDialogue) {
+                // Enhance existing dialogue
+                aiDialogue = await window.aiDialogueService.enhanceDialogue(baseDialogue, context);
+            } else {
+                // Generate completely new dialogue
+                aiDialogue = await window.aiDialogueService.generateNewDialogue(topic, context);
+            }
+
+            // Use the AI generated dialogue
+            this.originalDialogue = aiDialogue;
+            
+            // Process and display the dialogue
+            this.processDialogue();
+            this.populateConversationSelector(); 
+            this.setCurrentConversation(0);
+
+            // Update UI to show this is AI generated
+            this.updateCurrentLanguageDisplay('English (AI Generated)');
+            
+        } catch (error) {
+            console.error('AI dialogue generation failed:', error);
+            
+            // Fallback to base dialogue if AI fails
+            if (this.getRandomBaseDialogue()) {
+                Utils.showToast(`AI generation failed: ${error.message}. Using base dialogue.`, 'warning');
+                this.originalDialogue = this.getRandomBaseDialogue();
+                this.processDialogue();
+                this.populateConversationSelector();
+                this.setCurrentConversation(0);
+            } else {
+                this.showError(`Failed to generate AI dialogue: ${error.message}`);
+            }
+        } finally {
+            this.setLoading(false);
+        }
+    }
+
+    getRandomBaseDialogue() {
+        try {
+            if (typeof getDialogueForLanguage === 'undefined') {
+                return null;
+            }
+            
+            const dialogueText = getDialogueForLanguage('English');
+            if (!dialogueText) return null;
+
+            // Parse to get individual conversations
+            const conversations = dialogueText.split(/Conversation \d+/).filter(conv => conv.trim());
+            
+            if (conversations.length === 0) return null;
+            
+            // Return a random conversation as base
+            const randomIndex = Math.floor(Math.random() * conversations.length);
+            return `Conversation 1${conversations[randomIndex]}`;
+            
+        } catch (error) {
+            console.warn('Could not get base dialogue:', error);
+            return null;
+        }
+    }
+
+    updateCurrentLanguageDisplay(text) {
+        const currentLanguageSpan = document.getElementById('current-language');
+        if (currentLanguageSpan) {
+            currentLanguageSpan.textContent = text;
         }
     }
 
