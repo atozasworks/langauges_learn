@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AtoZ Services Launcher</title>
+    <style>
+        :root {
+            --bg-1: #0f172a;
+            --bg-2: #1e293b;
+            --bg-3: #0b1022;
+            --card-bg: rgba(255, 255, 255, 0.08);
+            --card-border: rgba(255, 255, 255, 0.22);
+            --text-main: #f8fafc;
+            --text-muted: #cbd5e1;
+            --accent: #60a5fa;
+            --accent-2: #22d3ee;
+            --success: #34d399;
+            --shadow: 0 20px 40px rgba(2, 6, 23, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-main);
+            background:
+                radial-gradient(circle at 20% 20%, rgba(96, 165, 250, 0.3), transparent 35%),
+                radial-gradient(circle at 80% 0%, rgba(34, 211, 238, 0.24), transparent 35%),
+                linear-gradient(140deg, var(--bg-1), var(--bg-2) 55%, var(--bg-3));
+            min-height: 100vh;
+            line-height: 1.55;
+        }
+
+        .page {
+            width: min(1120px, 92%);
+            margin: 0 auto;
+            padding: 28px 0 38px;
+        }
+
+        .glass {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 22px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+        }
+
+        .site-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 16px 20px;
+            margin-bottom: 26px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            width: 44px;
+            height: 44px;
+            border-radius: 13px;
+            display: grid;
+            place-items: center;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            background: linear-gradient(140deg, var(--accent), var(--accent-2));
+            color: #0a1225;
+            box-shadow: 0 10px 22px rgba(34, 211, 238, 0.35);
+        }
+
+        .brand h1 {
+            font-size: clamp(1.1rem, 2.6vw, 1.4rem);
+            margin-bottom: 2px;
+        }
+
+        .brand p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .hero {
+            padding: clamp(28px, 5vw, 48px);
+            margin-bottom: 24px;
+        }
+
+        .hero h2 {
+            font-size: clamp(1.75rem, 4.8vw, 3.05rem);
+            line-height: 1.18;
+            max-width: 15ch;
+            margin-bottom: 14px;
+        }
+
+        .hero p {
+            color: var(--text-muted);
+            max-width: 66ch;
+            margin-bottom: 24px;
+            font-size: clamp(1rem, 2.2vw, 1.07rem);
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .btn {
+            border: 0;
+            cursor: pointer;
+            text-decoration: none;
+            border-radius: 12px;
+            padding: 11px 18px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            color: #03112a;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            box-shadow: 0 12px 25px rgba(96, 165, 250, 0.32);
+        }
+
+        .btn-secondary {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.09);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+        }
+
+        .btn-run {
+            color: #062321;
+            background: linear-gradient(135deg, #6ee7b7, var(--success));
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            opacity: 0.96;
+        }
+
+        .desc-section {
+            padding: clamp(20px, 4vw, 28px);
+            margin-bottom: 24px;
+        }
+
+        .desc-section h3,
+        .versions h3 {
+            font-size: clamp(1.18rem, 2.8vw, 1.45rem);
+            margin-bottom: 10px;
+        }
+
+        .desc-section p {
+            color: var(--text-muted);
+            max-width: 72ch;
+        }
+
+        .versions {
+            padding: clamp(20px, 4vw, 30px);
+            margin-bottom: 24px;
+        }
+
+        .versions-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px 16px;
+            margin-bottom: 16px;
+        }
+
+        .versions-header p {
+            color: var(--text-muted);
+            font-size: 0.94rem;
+        }
+
+        .version-grid {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .version-card {
+            padding: 18px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 188px;
+        }
+
+        .version-card h4 {
+            font-size: 1.08rem;
+            margin-bottom: 8px;
+        }
+
+        .version-card p {
+            color: var(--text-muted);
+            margin-bottom: 18px;
+            font-size: 0.95rem;
+        }
+
+        .site-footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            padding: 16px 10px;
+        }
+
+        @media (min-width: 700px) {
+            .version-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 1040px) {
+            .version-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <header class="site-header glass">
+            <div class="brand">
+                <div class="logo" aria-hidden="true">AZ</div>
+                <div>
+                    <h1>AtoZ Services</h1>
+                    <p>Language Learning App Launcher</p>
+                </div>
+            </div>
+            <button class="btn btn-secondary" id="jumpToVersions">Explore Versions</button>
+        </header>
+
+        <section class="hero glass" aria-labelledby="hero-title">
+            <h2 id="hero-title">Launch the right learning experience in one click.</h2>
+            <p>Choose from multiple independently running app versions. Compare features, test behaviors, and open any build instantly from this central dashboard.</p>
+            <div class="hero-actions">
+                <button class="btn btn-primary" id="heroRunLatest" data-href="version4dialogswithname/index.html">Run Latest Stable</button>
+                <button class="btn btn-secondary" id="heroRunGroq" data-href="versiongroqgenerateddealogs/index.html">Try Groq Dialog Version</button>
+            </div>
+        </section>
+
+        <section class="desc-section glass" aria-labelledby="description-title">
+            <h3 id="description-title">About This Dashboard</h3>
+            <p>This homepage acts as a clean launcher hub for all available language-learning builds in this project. Each version opens separately with its own folder assets, scripts, and runtime behavior.</p>
+        </section>
+
+        <section class="versions glass" id="versions" aria-labelledby="versions-title">
+            <div class="versions-header">
+                <h3 id="versions-title">Version Selection</h3>
+                <p>Select a version card and click <strong>Run Version</strong>.</p>
+            </div>
+
+            <div class="version-grid">
+                <article class="version-card">
+                    <div>
+                        <h4>LAN Learn</h4>
+                        <p>Foundational learning interface focused on core language-learning flows and lightweight setup.</p>
+                    </div>
+                    <button class="btn btn-run run-version" data-href="lan_learn/index.html">Run Version</button>
+                </article>
+
+                <article class="version-card">
+                    <div>
+                        <h4>Version 2 - Dialog With Name</h4>
+                        <p>Introduces named dialogue interactions and refined conversation-driven learner experience.</p>
+                    </div>
+                    <button class="btn btn-run run-version" data-href="version2dialogwithname/index.html">Run Version</button>
+                </article>
+
+                <article class="version-card">
+                    <div>
+                        <h4>Version 4 - Dialogs With Name</h4>
+                        <p>Expanded dialogue capabilities with stronger structure and improved readability across scenarios.</p>
+                    </div>
+                    <button class="btn btn-run run-version" data-href="version4dialogswithname/index.html">Run Version</button>
+                </article>
+
+                <article class="version-card">
+                    <div>
+                        <h4>Groq Generated Dialogs</h4>
+                        <p>AI-assisted dialogue generation variant for dynamic conversational learning experiments.</p>
+                    </div>
+                    <button class="btn btn-run run-version" data-href="versiongroqgenerateddealogs/index.html">Run Version</button>
+                </article>
+            </div>
+        </section>
+
+        <footer class="site-footer">
+            <p>© <span id="year"></span> AtoZ Services • Multi-Version Learning Launcher</p>
+        </footer>
+    </main>
+
+    <script>
+        const navigateTo = (path) => {
+            if (!path) {
+                return;
+            }
+            window.location.href = path;
+        };
+
+        document.getElementById("year").textContent = String(new Date().getFullYear());
+
+        document.getElementById("jumpToVersions").addEventListener("click", () => {
+            document.getElementById("versions").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+
+        document.getElementById("heroRunLatest").addEventListener("click", (event) => {
+            navigateTo(event.currentTarget.dataset.href);
+        });
+
+        document.getElementById("heroRunGroq").addEventListener("click", (event) => {
+            navigateTo(event.currentTarget.dataset.href);
+        });
+
+        document.querySelectorAll(".run-version").forEach((button) => {
+            button.addEventListener("click", (event) => {
+                navigateTo(event.currentTarget.dataset.href);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -133,9 +133,8 @@ class GTongueLearnApp {
             link.addEventListener('click', (e) => {
                 const href = link.getAttribute('href');
                 
-                // Skip navigation handling for external links (GitHub link)
-                if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-                    // Let the link open normally in a new tab
+                // Let non-hash links navigate normally (external or relative URLs)
+                if (!href || !href.startsWith('#')) {
                     return;
                 }
                 
