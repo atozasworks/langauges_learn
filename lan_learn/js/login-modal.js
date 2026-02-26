@@ -136,12 +136,24 @@
     if (event.key === "Escape" && modal.classList.contains("show")) closeModal();
   });
 
-  // ─── Logout button ───
+  // ─── Logout button — show confirmation popup ───
+  const logoutYesBtn = document.getElementById("logout-yes-btn");
+  const logoutNoBtn = document.getElementById("logout-no-btn");
+
   navLogoutBtn?.addEventListener("click", () => {
+    Utils.showPopup('logout-popup');
+  });
+
+  logoutYesBtn?.addEventListener("click", () => {
+    Utils.hidePopup('logout-popup');
     sessionStorage.removeItem("loggedInUser");
     showLoggedOutState();
     // Notify other modules (e.g. LearnHome) about logout
     window.dispatchEvent(new CustomEvent('userLogout'));
+  });
+
+  logoutNoBtn?.addEventListener("click", () => {
+    Utils.hidePopup('logout-popup');
   });
 
   // ─── Show logged-in state in navbar ───
