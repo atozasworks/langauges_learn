@@ -140,6 +140,8 @@
   navLogoutBtn?.addEventListener("click", () => {
     sessionStorage.removeItem("loggedInUser");
     showLoggedOutState();
+    // Notify other modules (e.g. LearnHome) about logout
+    window.dispatchEvent(new CustomEvent('userLogout'));
   });
 
   // ─── Show logged-in state in navbar ───
@@ -173,6 +175,9 @@
     const userData = { name, email };
     sessionStorage.setItem("loggedInUser", JSON.stringify(userData));
     showLoggedInState(name, email);
+
+    // Notify other modules (e.g. LearnHome) about login
+    window.dispatchEvent(new CustomEvent('userLogin', { detail: { name, email } }));
 
     // Show success briefly, then close modal
     formSuccess.textContent = `Welcome, ${name}!`;

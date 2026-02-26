@@ -99,6 +99,54 @@ function createTables(PDO $pdo): void
             INDEX `idx_otp_email` (`email`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `learning_team` (
+            `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `user_email`    VARCHAR(255) NOT NULL,
+            `learner_name`  VARCHAR(255) NOT NULL,
+            `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_lt_user` (`user_email`),
+            UNIQUE KEY `uk_user_learner` (`user_email`, `learner_name`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+}
+
+/* ────────────────────────────────────────────
+   Learning Team helpers
+   ──────────────────────────────────────────── */
+
+/**
+ * Get all learners for a specific user.
+ */
+function getLearnersByUser(string $email): array
+{
+    $pdo = getLoginDbConnection();
+    $stmt = $pdo->prepare("SELECT id, learner_name FROM `learning_team` WHERE user_email = :email ORDER BY created_at ASC");
+    $stmt->execute([':email' => $email]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Add a learner to a user's team. Returns the new row id.
+ */
+function addLearner(string $email, string $name): int
+{
+    $pdo = getLoginDbConnection();
+    $stmt = $pdo->prepare("INSERT INTO `learning_team` (user_email, learner_name) VALUES (:email, :name)");
+    $stmt->execute([':email' => $email, ':name' => $name]);
+    return (int) $pdo->lastInsertId();
+}
+
+/**
+ * Delete a learner from a user's team (only if it belongs to that user).
+ */
+function deleteLearner(string $email, int $learnerId): bool
+{
+    $pdo = getLoginDbConnection();
+    $stmt = $pdo->prepare("DELETE FROM `learning_team` WHERE id = :id AND user_email = :email LIMIT 1");
+    $stmt->execute([':id' => $learnerId, ':email' => $email]);
+    return $stmt->rowCount() > 0;
 }
 
 /**
