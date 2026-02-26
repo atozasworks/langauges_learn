@@ -58,6 +58,10 @@ class LearnHome {
         this.refreshTable();
         this.updateCounts();
         this.showLoginRequiredState();
+
+        // Stop any running dialogue session and go back to home
+        window.dialoguePage?.stopAutoAdvance?.();
+        if (app) app.showPage('home');
     }
 
     showLoginRequiredState() {
