@@ -1,82 +1,100 @@
 <?php
-session_start();
-require_once __DIR__ . '/google-config.php';
+/**
+ * Google OAuth callback: exchange code for token, get user info, create/update user, set session.
+ */
 
-$config = getGoogleOAuthConfig();
+require_once __DIR__ . '/session.php';
+require_once __DIR__ . '/db.php';
+
+$config = require __DIR__ . '/google-config.php';
+$clientId = $config['client_id'] ?? '';
+$clientSecret = $config['client_secret'] ?? '';
+
+$baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+    . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
+    . dirname($_SERVER['REQUEST_URI'] ?? '/auth-backend');
+$redirectUri = rtrim($baseUrl, '/') . '/google-callback.php';
+
+$errorUrl = '../index.html?error=google_login_failed';
 
 if (empty($_GET['code']) || empty($_GET['state'])) {
-    http_response_code(400);
-    echo 'Invalid Google callback.';
+    header('Location: ' . $errorUrl);
     exit;
 }
 
-if (!isset($_SESSION['google_oauth_state']) || $_GET['state'] !== $_SESSION['google_oauth_state']) {
-    http_response_code(400);
-    echo 'State validation failed.';
+if (empty($_SESSION['oauth_state']) || $_GET['state'] !== $_SESSION['oauth_state']) {
+    header('Location: ' . $errorUrl);
     exit;
 }
 
-unset($_SESSION['google_oauth_state']);
+unset($_SESSION['oauth_state']);
 
-if ($config['client_secret'] === '') {
-    http_response_code(500);
-    echo 'Google Client Secret missing. Set GOOGLE_CLIENT_SECRET in environment.';
+$code = $_GET['code'];
+
+$tokenResp = @file_get_contents('https://oauth2.googleapis.com/token', false, stream_context_create([
+    'http' => [
+        'method'  => 'POST',
+        'header'  => 'Content-Type: application/x-www-form-urlencoded',
+        'content' => http_build_query([
+            'code'          => $code,
+            'client_id'     => $clientId,
+            'client_secret' => $clientSecret,
+            'redirect_uri'  => $redirectUri,
+            'grant_type'    => 'authorization_code',
+        ]),
+    ],
+]));
+
+if ($tokenResp === false) {
+    header('Location: ' . $errorUrl);
     exit;
 }
 
-$tokenRequestBody = [
-    'code' => $_GET['code'],
-    'client_id' => $config['client_id'],
-    'client_secret' => $config['client_secret'],
-    'redirect_uri' => $config['redirect_uri'],
-    'grant_type' => 'authorization_code'
-];
-
-$curl = curl_init($config['token_url']);
-curl_setopt_array($curl, [
-    CURLOPT_POST => true,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
-    CURLOPT_POSTFIELDS => http_build_query($tokenRequestBody)
-]);
-
-$tokenResponseRaw = curl_exec($curl);
-$tokenHttpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-curl_close($curl);
-
-$tokenResponse = json_decode($tokenResponseRaw, true);
-
-if ($tokenHttpCode !== 200 || empty($tokenResponse['access_token'])) {
-    http_response_code(401);
-    echo 'Failed to get access token from Google.';
+$token = json_decode($tokenResp, true);
+if (empty($token['access_token'])) {
+    header('Location: ' . $errorUrl);
     exit;
 }
 
-$accessToken = $tokenResponse['access_token'];
+$userInfoResp = @file_get_contents('https://www.googleapis.com/oauth2/v2/userinfo', false, stream_context_create([
+    'http' => [
+        'header' => 'Authorization: Bearer ' . $token['access_token'],
+    ],
+]));
 
-$userCurl = curl_init($config['userinfo_url']);
-curl_setopt_array($userCurl, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $accessToken]
-]);
-
-$userResponseRaw = curl_exec($userCurl);
-$userHttpCode = curl_getinfo($userCurl, CURLINFO_HTTP_CODE);
-curl_close($userCurl);
-
-$userProfile = json_decode($userResponseRaw, true);
-
-if ($userHttpCode !== 200 || empty($userProfile['email'])) {
-    http_response_code(401);
-    echo 'Failed to fetch Google user profile.';
+if ($userInfoResp === false) {
+    header('Location: ' . $errorUrl);
     exit;
 }
 
-$_SESSION['auth_user'] = [
-    'email' => $userProfile['email'],
-    'name' => $userProfile['name'] ?? '',
-    'picture' => $userProfile['picture'] ?? ''
-];
+$userInfo = json_decode($userInfoResp, true);
+if (empty($userInfo['id']) || empty($userInfo['email'])) {
+    header('Location: ' . $errorUrl);
+    exit;
+}
 
-header('Location: ../login-modal.html?google=success');
+$googleId = $userInfo['id'];
+$email = filter_var($userInfo['email'], FILTER_SANITIZE_EMAIL);
+$name = trim($userInfo['name'] ?? $userInfo['email'] ?? '');
+
+$stmt = $pdo->prepare('SELECT id, name, email FROM users WHERE google_id = ? OR email = ? LIMIT 1');
+$stmt->execute([$googleId, $email]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if ($user) {
+    $pdo->prepare('UPDATE users SET name = ?, google_id = ? WHERE id = ?')
+        ->execute([$name ?: $user['name'], $googleId, $user['id']]);
+    $user['name'] = $name ?: $user['name'];
+} else {
+    $pdo->prepare('INSERT INTO users (name, email, google_id, created_at) VALUES (?, ?, ?, NOW())')
+        ->execute([$name, $email, $googleId]);
+    $user = [
+        'id'    => (int) $pdo->lastInsertId(),
+        'name'  => $name,
+        'email' => $email,
+    ];
+}
+
+auth_set_user($user);
+header('Location: ../index.html');
 exit;

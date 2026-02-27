@@ -1,10 +1,13 @@
 <?php
-
+/**
+ * SMTP configuration example for OTP emails.
+ * Copy to smtp-config.local.php and set your values.
+ */
 return [
-    'name' => 'atozas.com',
-    'server' => 'mail.atozas.com',
-    'port' => 465,
-    'secure' => true,
-    'email' => 'no-reply@atozas.com',
-    'password' => 'REPLACE_WITH_SMTP_PASSWORD'
+    'name'    => getenv('SMTP_NAME') ?: 'GTongue Learn',
+    'host'    => getenv('SMTP_SERVER') ?: 'smtp.hostinger.com',
+    'port'    => (int) (getenv('SMTP_PORT') ?: 465),
+    'secure'  => filter_var(getenv('SMTP_SECURE') ?: 'true', FILTER_VALIDATE_BOOLEAN),
+    'user'    => getenv('SMTP_EMAIL') ?: 'no-reply@yourdomain.com',
+    'pass'    => getenv('SMTP_EMAIL_PASSWORD') ?: 'YYiPNiLmtx4@11',
 ];

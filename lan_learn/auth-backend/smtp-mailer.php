@@ -1,99 +1,153 @@
 <?php
+/**
+ * SMTP mailer for sending OTP emails (raw sockets, no PHPMailer dependency).
+ * Uses stream_socket_client with SSL context for reliable TLS/SSL connections.
+ */
 
-function getLocalSmtpConfig(): array
-{
-    $localConfigFile = __DIR__ . DIRECTORY_SEPARATOR . 'smtp-config.local.php';
-    if (!is_file($localConfigFile)) {
-        return [];
-    }
-
-    $config = require $localConfigFile;
-    return is_array($config) ? $config : [];
-}
+$smtpConfig = require __DIR__ . '/smtp-config.php';
 
 /**
- * SMTP settings loaded from environment variables.
+ * Send an email via SMTP.
+ *
+ * @param string $to      Recipient email
+ * @param string $subject Subject
+ * @param string $body    Plain text body
+ * @return array { success: bool, message: string }
  */
-function getSmtpConfig(): array
-{
-    $local = getLocalSmtpConfig();
+function smtp_send(string $to, string $subject, string $body): array {
+    global $smtpConfig;
+    $host     = $smtpConfig['host'];
+    $port     = (int) $smtpConfig['port'];
+    $secure   = (bool) $smtpConfig['secure'];
+    $user     = $smtpConfig['user'];
+    $pass     = $smtpConfig['pass'];
+    $fromName = $smtpConfig['name'] ?? 'GTongue Learn';
 
-    return [
-        'name' => $local['name'] ?? (getenv('SMTP_NAME') ?: 'atozas.com'),
-        'server' => $local['server'] ?? (getenv('SMTP_SERVER') ?: 'mail.atozas.com'),
-        'port' => (int)($local['port'] ?? (getenv('SMTP_PORT') ?: '465')),
-        'secure' => isset($local['secure'])
-            ? (bool)$local['secure']
-            : filter_var(getenv('SMTP_SECURE') ?: 'true', FILTER_VALIDATE_BOOLEAN),
-        'email' => $local['email'] ?? (getenv('SMTP_EMAIL') ?: 'no-reply@atozas.com'),
-        'password' => $local['password'] ?? (getenv('SMTP_EMAIL_PASSWORD') ?: '')
-    ];
-}
-
-/**
- * Sends OTP email using SMTP AUTH LOGIN over SSL.
- */
-function sendOtpEmail(string $toEmail, string $otp): void
-{
-    $config = getSmtpConfig();
-
-    if ($config['password'] === '') {
-        throw new RuntimeException('SMTP password missing. Set SMTP_EMAIL_PASSWORD environment variable.');
+    if (empty($pass)) {
+        return ['success' => false, 'message' => 'SMTP password not configured'];
     }
 
-    $scheme = $config['secure'] ? 'ssl://' : '';
-    $socket = @fsockopen($scheme . $config['server'], $config['port'], $errorNumber, $errorMessage, 20);
+    // SSL context: disable peer verification (required for Windows/XAMPP localhost dev)
+    $ctx = stream_context_create([
+        'ssl' => [
+            'verify_peer'       => false,
+            'verify_peer_name'  => false,
+            'allow_self_signed' => true,
+            'crypto_method'     => STREAM_CRYPTO_METHOD_TLS_CLIENT,
+        ],
+    ]);
 
-    if (!$socket) {
-        throw new RuntimeException('SMTP connection failed: ' . $errorMessage);
+    // Port 465 = direct SSL; Port 587 = plain TCP then STARTTLS upgrade
+    $useStartTls = (!$secure && $port === 587) || ($port === 587);
+    $target = ($secure && $port === 465 ? 'ssl://' : 'tcp://') . $host . ':' . $port;
+
+    $sock = @stream_socket_client($target, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $ctx);
+    if (!$sock) {
+        $phpErr = error_get_last();
+        $detail = $errstr ?: ($phpErr['message'] ?? 'unknown error');
+        return ['success' => false, 'message' => 'Could not connect to SMTP server: ' . $detail];
     }
+    stream_set_timeout($sock, 15);
 
-    smtpExpect($socket, [220]);
-    smtpCommand($socket, 'EHLO ' . $config['name'], [250]);
-    smtpCommand($socket, 'AUTH LOGIN', [334]);
-    smtpCommand($socket, base64_encode($config['email']), [334]);
-    smtpCommand($socket, base64_encode($config['password']), [235]);
-    smtpCommand($socket, 'MAIL FROM:<' . $config['email'] . '>', [250]);
-    smtpCommand($socket, 'RCPT TO:<' . $toEmail . '>', [250, 251]);
-    smtpCommand($socket, 'DATA', [354]);
-
-    $subject = 'Your OTP for Login';
-    $body = "Your login OTP is: {$otp}.\r\nThis OTP is valid for 5 minutes.";
-
-    $message = '';
-    $message .= 'From: ' . $config['name'] . ' <' . $config['email'] . ">\r\n";
-    $message .= 'To: <' . $toEmail . ">\r\n";
-    $message .= 'Subject: ' . $subject . "\r\n";
-    $message .= "MIME-Version: 1.0\r\n";
-    $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
-    $message .= "\r\n";
-    $message .= $body . "\r\n.\r\n";
-
-    fwrite($socket, $message);
-    smtpExpect($socket, [250]);
-    smtpCommand($socket, 'QUIT', [221]);
-
-    fclose($socket);
-}
-
-function smtpCommand($socket, string $command, array $expectedCodes): void
-{
-    fwrite($socket, $command . "\r\n");
-    smtpExpect($socket, $expectedCodes);
-}
-
-function smtpExpect($socket, array $expectedCodes): void
-{
-    $response = '';
-    while (($line = fgets($socket, 515)) !== false) {
-        $response .= $line;
-        if (preg_match('/^[0-9]{3}\s/', $line)) {
-            break;
+    // Read full multi-line SMTP response; returns last status line
+    $readResponse = function () use ($sock): string {
+        $last = '';
+        while ($line = fgets($sock, 512)) {
+            $last = $line;
+            if (strlen($line) >= 4 && $line[3] === ' ') break;
         }
+        return $last;
+    };
+
+    $send = function (string $cmd) use ($sock): void {
+        fwrite($sock, $cmd . "\r\n");
+    };
+
+    $code = fn(string $r): int => (int) substr(trim($r), 0, 3);
+
+    $ehloHost = $_SERVER['SERVER_NAME'] ?? 'localhost';
+
+    // Handshake
+    $banner = $readResponse();
+    if ($code($banner) !== 220) {
+        fclose($sock);
+        return ['success' => false, 'message' => 'SMTP banner error: ' . trim($banner)];
     }
 
-    $code = (int)substr($response, 0, 3);
-    if (!in_array($code, $expectedCodes, true)) {
-        throw new RuntimeException('SMTP error: ' . trim($response));
+    $send('EHLO ' . $ehloHost);
+    $ehlo = $readResponse();
+    if ($code($ehlo) !== 250) {
+        $send('HELO ' . $ehloHost);
+        $readResponse();
     }
+
+    // STARTTLS upgrade for port 587
+    if ($useStartTls) {
+        $send('STARTTLS');
+        $tlsResp = $readResponse();
+        if ($code($tlsResp) !== 220) {
+            fclose($sock);
+            return ['success' => false, 'message' => 'STARTTLS not accepted: ' . trim($tlsResp)];
+        }
+        if (!stream_socket_enable_crypto($sock, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+            fclose($sock);
+            return ['success' => false, 'message' => 'TLS handshake failed — check PHP openssl extension'];
+        }
+        // Re-introduce after TLS upgrade
+        $send('EHLO ' . $ehloHost);
+        $readResponse();
+    }
+
+    // AUTH LOGIN
+    $send('AUTH LOGIN');
+    $r = $readResponse();
+    if ($code($r) !== 334) {
+        fclose($sock);
+        return ['success' => false, 'message' => 'AUTH LOGIN rejected: ' . trim($r)];
+    }
+
+    $send(base64_encode($user));
+    $readResponse();
+
+    $send(base64_encode($pass));
+    $authResp = $readResponse();
+    if ($code($authResp) !== 235) {
+        fclose($sock);
+        return ['success' => false, 'message' => 'SMTP authentication failed — check email/password in smtp-config.local.php'];
+    }
+
+    // Send message
+    $send('MAIL FROM:<' . $user . '>');
+    $readResponse();
+
+    $send('RCPT TO:<' . $to . '>');
+    $rcptResp = $readResponse();
+    if ($code($rcptResp) !== 250) {
+        fclose($sock);
+        return ['success' => false, 'message' => 'Recipient rejected: ' . trim($rcptResp)];
+    }
+
+    $send('DATA');
+    $readResponse();
+
+    $msg  = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <{$user}>\r\n";
+    $msg .= "To: {$to}\r\n";
+    $msg .= "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n";
+    $msg .= "MIME-Version: 1.0\r\n";
+    $msg .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $msg .= "Content-Transfer-Encoding: base64\r\n";
+    $msg .= "\r\n";
+    $msg .= chunk_split(base64_encode($body));
+
+    $send($msg);
+    $send('.');
+    $dataResp = $readResponse();
+
+    $send('QUIT');
+    fclose($sock);
+
+    if ($code($dataResp) !== 250) {
+        return ['success' => false, 'message' => 'Message rejected by server: ' . trim($dataResp)];
+    }
+    return ['success' => true, 'message' => 'OK'];
 }

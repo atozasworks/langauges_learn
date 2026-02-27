@@ -1,58 +1,45 @@
 <?php
 /**
- * Send OTP endpoint — generates 4-digit OTP, saves to MySQL, sends via SMTP.
+ * Send OTP to email. Creates user if not exists. OTP expires in 10 minutes.
  */
+
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
 
-// Handle preflight
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/smtp-mailer.php';
+
+$input = json_decode(file_get_contents('php://input') ?: '{}', true) ?: [];
+$email = isset($input['email']) ? trim($input['email']) : '';
+
+if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    echo json_encode(['success' => false, 'message' => 'Valid email is required']);
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed. Use POST.']);
+$otp = (string) random_int(100000, 999999);
+$expiresAt = date('Y-m-d H:i:s', time() + 600); // 10 minutes
+
+$stmt = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+$stmt->execute([$email]);
+$row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if ($row) {
+    $pdo->prepare('UPDATE users SET otp = ?, otp_expires_at = ? WHERE id = ?')
+        ->execute([$otp, $expiresAt, $row['id']]);
+} else {
+    $pdo->prepare('INSERT INTO users (name, email, otp, otp_expires_at, created_at) VALUES (\'\', ?, ?, ?, NOW())')
+        ->execute([$email, $otp, $expiresAt]);
+}
+
+$subject = 'Your login code - GTongue Learn';
+$body = "Your one-time login code is: $otp\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, you can ignore this email.";
+
+$result = smtp_send($email, $subject, $body);
+
+if (!$result['success']) {
+    echo json_encode(['success' => false, 'message' => $result['message'] ?: 'Failed to send email']);
     exit;
 }
 
-try {
-    require_once __DIR__ . '/db.php';
-    require_once __DIR__ . '/smtp-mailer.php';
-
-    $data  = json_decode(file_get_contents('php://input'), true);
-    $email = isset($data['email']) ? trim($data['email']) : '';
-
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Enter a valid email address.']);
-        exit;
-    }
-
-    // Generate 4-digit OTP
-    $otp = str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-
-    // Save to MySQL
-    saveOtpCode($email, $otp, 300);
-
-    // Send via SMTP
-    sendOtpEmail($email, $otp);
-
-    echo json_encode(['success' => true, 'message' => 'OTP sent successfully to your email.']);
-
-} catch (Throwable $e) {
-    http_response_code(500);
-    $resp = ['success' => false, 'message' => 'Failed to send OTP.'];
-
-    // Show error detail on localhost
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    if (in_array($ip, ['127.0.0.1', '::1'], true)) {
-        $resp['error_detail'] = $e->getMessage();
-        $resp['error_file']   = $e->getFile() . ':' . $e->getLine();
-    }
-
-    echo json_encode($resp);
-}
+echo json_encode(['success' => true, 'message' => 'OTP sent']);
+exit;

@@ -1,29 +1,35 @@
 <?php
-session_start();
-require_once __DIR__ . '/google-config.php';
+/**
+ * Redirect user to Google OAuth consent screen.
+ */
 
-$config = getGoogleOAuthConfig();
+require_once __DIR__ . '/session.php';
 
-if ($config['client_id'] === '') {
-    http_response_code(500);
-    echo 'Google Client ID is missing.';
+$config = require __DIR__ . '/google-config.php';
+$clientId = $config['client_id'] ?? '';
+
+if (empty($clientId)) {
+    header('Location: ../index.html?error=google_not_configured');
     exit;
 }
 
+$base = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+    . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
+    . dirname($_SERVER['REQUEST_URI'] ?? '/auth-backend');
+$redirectUri = rtrim($base, '/') . '/google-callback.php';
+
 $state = bin2hex(random_bytes(16));
-$_SESSION['google_oauth_state'] = $state;
+$_SESSION['oauth_state'] = $state;
 
 $params = [
-    'client_id' => $config['client_id'],
-    'redirect_uri' => $config['redirect_uri'],
+    'client_id'     => $clientId,
+    'redirect_uri'  => $redirectUri,
     'response_type' => 'code',
-    'scope' => 'openid email profile',
-    'access_type' => 'online',
-    'include_granted_scopes' => 'true',
-    'state' => $state,
-    'prompt' => 'select_account'
+    'scope'         => 'openid email profile',
+    'state'         => $state,
+    'access_type'   => 'offline',
+    'prompt'        => 'consent',
 ];
-
-$googleAuthUrl = $config['auth_url'] . '?' . http_build_query($params);
-header('Location: ' . $googleAuthUrl);
+$url = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query($params);
+header('Location: ' . $url);
 exit;

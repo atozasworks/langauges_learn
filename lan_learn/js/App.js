@@ -132,24 +132,8 @@ class GTongueLearnApp {
         navLinks.forEach(link => {
             link.addEventListener('click', (e) => {
                 const href = link.getAttribute('href');
-
-                if (link.id === 'nav-login') {
-                    e.preventDefault();
-                    const loginModal = document.getElementById('loginModal');
-                    if (loginModal) {
-                        loginModal.classList.add('show');
-                        document.body.classList.add('modal-open');
-                    }
-                    return;
-                }
                 
-                // Skip navigation handling for external links (GitHub link)
-                if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-                    // Let the link open normally in a new tab
-                    return;
-                }
-
-                // Let normal page links (e.g., login-modal.html) work normally.
+                // Let non-hash links navigate normally (external or relative URLs)
                 if (!href || !href.startsWith('#')) {
                     return;
                 }

@@ -1,7 +1,10 @@
-# Default Learners JSON file (contains user-specific data)
-# Ignore the default learners JSON file
-js/default-learners.json
-**/default-learners.json
+# Auth backend local config (secrets)
+lan_learn/auth-backend/db-config.local.php
+lan_learn/auth-backend/smtp-config.local.php
+lan_learn/auth-backend/google-config.local.php
+**/db-config.local.php
+**/smtp-config.local.php
+**/google-config.local.php
 
 # Node modules (if any)
 node_modules/

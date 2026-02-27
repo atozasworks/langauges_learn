@@ -1,13 +1,13 @@
 <?php
 /**
- * XAMPP MySQL config — no password for root by default.
- * Database: lan_learn_auth (auto-created by db.php)
+ * Local database config (not committed).
+ * Copy from db-config.example.php and set your DB credentials.
  */
 return [
-    'host'     => '127.0.0.1',
-    'port'     => 3306,
-    'dbname'   => 'lan_learn_auth',
-    'username' => 'root',
-    'password' => '',
+    'host'     => getenv('DB_HOST') ?: 'localhost',
+    'port'     => getenv('DB_PORT') ?: 3307,
+    'dbname'   => getenv('DB_NAME') ?: 'lan_learn',
+    'username' => getenv('DB_USER') ?: 'root',
+    'password' => getenv('DB_PASSWORD') ?: '',
     'charset'  => 'utf8mb4',
 ];

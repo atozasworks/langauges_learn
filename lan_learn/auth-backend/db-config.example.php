@@ -1,15 +1,14 @@
 <?php
-
+/**
+ * Database configuration example.
+ * Copy to db-config.php and set your values.
+ * Do not commit db-config.php.
+ */
 return [
-    'driver' => 'mysql',
-    'host' => '127.0.0.1',
-    'port' => 3306,
-    'dbname' => 'lan_learn_auth',
-    'username' => 'root',
-    'password' => '',
-    'charset' => 'utf8mb4',
-
-    // Optional if you switch to sqlite:
-    // 'driver' => 'sqlite',
-    // 'sqlite_path' => __DIR__ . '/data/login-audit.sqlite',
+    'host'     => getenv('DB_HOST') ?: 'localhost',
+    'port'     => getenv('DB_PORT') ?: 3307,
+    'dbname'   => getenv('DB_NAME') ?: 'your_database',
+    'username' => getenv('DB_USER') ?: 'your_user',
+    'password' => getenv('DB_PASSWORD') ?: '',
+    'charset'  => 'utf8mb4',
 ];
