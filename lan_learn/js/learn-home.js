@@ -1,79 +1,124 @@
-// Learn Home Page JavaScript
+// Learn Home Page JavaScript — User-specific Learning Team (API-backed)
 class LearnHome {
     constructor() {
         this.learners = [];
         this.selectedLearners = [];
         this.dataTable = null;
+        this.loggedInUser = null; // { name, email }
         this.init();
     }
 
     async init() {
-        await this.loadLearners();
+        this.resolveLoggedInUser();
         this.setupEventListeners();
         this.initializeDataTable();
+
+        if (this.loggedInUser) {
+            await this.loadLearnersFromServer();
+        } else {
+            this.showLoginRequiredState();
+        }
+
         this.updateCounts();
-        // Update select-all checkbox after initialization
-        setTimeout(() => {
-            this.updateSelectAllCheckbox();
-        }, 100);
+        setTimeout(() => this.updateSelectAllCheckbox(), 100);
+
+        // Listen for login / logout events dispatched by login-modal.js
+        window.addEventListener('userLogin', (e) => this.onUserLogin(e.detail));
+        window.addEventListener('userLogout', () => this.onUserLogout());
+
         console.log('Learn Home initialized');
     }
 
+    // ─── Auth helpers ───────────────────────────────────
+
+    resolveLoggedInUser() {
+        try {
+            const raw = sessionStorage.getItem('loggedInUser');
+            if (raw) {
+                const u = JSON.parse(raw);
+                if (u && u.email) {
+                    this.loggedInUser = u;
+                }
+            }
+        } catch (_) {}
+    }
+
+    async onUserLogin(detail) {
+        this.loggedInUser = detail; // { name, email }
+        this.hideLoginRequiredState();
+        await this.loadLearnersFromServer();
+        this.refreshTable();
+        this.updateCounts();
+    }
+
+    onUserLogout() {
+        this.loggedInUser = null;
+        this.learners = [];
+        this.selectedLearners = [];
+        this.refreshTable();
+        this.updateCounts();
+        this.showLoginRequiredState();
+
+        // Stop any running dialogue session and go back to home
+        window.dialoguePage?.stopAutoAdvance?.();
+        if (app) app.showPage('home');
+    }
+
+    showLoginRequiredState() {
+        const input = document.getElementById('learner-input');
+        const addBtn = document.getElementById('add-learner-btn');
+        const startBtn = document.getElementById('start-learning-btn');
+        if (input) { input.disabled = true; input.placeholder = 'Login first to manage your team'; }
+        if (addBtn) addBtn.disabled = true;
+        if (startBtn) startBtn.disabled = true;
+
+        // Show login prompt inside empty table area
+        if (this.dataTable) {
+            this.dataTable.clear().draw();
+        }
+    }
+
+    hideLoginRequiredState() {
+        const input = document.getElementById('learner-input');
+        const addBtn = document.getElementById('add-learner-btn');
+        const startBtn = document.getElementById('start-learning-btn');
+        if (input) { input.disabled = false; input.placeholder = "Enter Learner's Name"; }
+        if (addBtn) addBtn.disabled = false;
+        if (startBtn) startBtn.disabled = false;
+    }
+
+    // ─── Event listeners ────────────────────────────────
+
     setupEventListeners() {
-        // Add learner button
         const addBtn = document.getElementById('add-learner-btn');
         const learnerInput = document.getElementById('learner-input');
-        
-        if (addBtn) {
-            addBtn.addEventListener('click', () => this.addLearner());
-        }
 
-        // Enter key on input
+        if (addBtn) addBtn.addEventListener('click', () => this.addLearner());
         if (learnerInput) {
             learnerInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    this.addLearner();
-                }
+                if (e.key === 'Enter') this.addLearner();
             });
         }
 
-        // Start learning button
         const startBtn = document.getElementById('start-learning-btn');
-        if (startBtn) {
-            startBtn.addEventListener('click', () => this.startLearning());
-        }
+        if (startBtn) startBtn.addEventListener('click', () => this.startLearning());
 
-        // Select all checkbox
         const selectAllCheckbox = document.getElementById('select-all');
         if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('change', (e) => {
-                this.handleSelectAll(e.target.checked);
-            });
+            selectAllCheckbox.addEventListener('change', (e) => this.handleSelectAll(e.target.checked));
         }
 
-        // Popup event listeners
         this.setupPopupListeners();
     }
 
     setupPopupListeners() {
-        // Warning popup OK button
         const warningOkBtn = document.getElementById('warning-ok-btn');
-        if (warningOkBtn) {
-            warningOkBtn.addEventListener('click', () => {
-                Utils.hidePopup('warning-popup');
-            });
-        }
+        if (warningOkBtn) warningOkBtn.addEventListener('click', () => Utils.hidePopup('warning-popup'));
 
-        // Delete popup buttons
         const deleteConfirmBtn = document.getElementById('delete-confirm-btn');
         const deleteCancelBtn = document.getElementById('delete-cancel-btn');
-        
-        if (deleteConfirmBtn) {
-            deleteConfirmBtn.addEventListener('click', () => {
-                this.confirmDelete();
-            });
-        }
 
+        if (deleteConfirmBtn) deleteConfirmBtn.addEventListener('click', () => this.confirmDelete());
         if (deleteCancelBtn) {
             deleteCancelBtn.addEventListener('click', () => {
                 Utils.hidePopup('delete-popup');
@@ -82,7 +127,14 @@ class LearnHome {
         }
     }
 
-    addLearner() {
+    // ─── Add / Delete learners (API-backed) ─────────────
+
+    async addLearner() {
+        if (!this.loggedInUser) {
+            Utils.showToast('Please login first to add learners.', 'warning');
+            return;
+        }
+
         const input = document.getElementById('learner-input');
         const name = input.value.trim();
 
@@ -93,76 +145,94 @@ class LearnHome {
 
         const formattedName = Utils.formatName(name);
 
-        // Check for duplicates
-        if (this.learners.some(learner => learner.name.toLowerCase() === formattedName.toLowerCase())) {
-            Utils.showToast(`The name "${formattedName}" already exists. Please enter a unique name.`, 'error');
+        // Local duplicate check
+        if (this.learners.some(l => l.name.toLowerCase() === formattedName.toLowerCase())) {
+            Utils.showToast(`"${formattedName}" already exists in your team.`, 'error');
             return;
         }
 
-        // Create new learner
-        const newLearner = {
-            id: Utils.generateId(),
-            name: formattedName
-        };
+        try {
+            const res = await fetch('./auth-backend/add-learner.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: this.loggedInUser.email, name: formattedName })
+            });
+            const data = await res.json();
 
-        this.learners.push(newLearner);
-        
-        // Automatically select the new learner for studies
-        this.selectedLearners.push(newLearner.id);
-        
-        this.saveLearners();
-        this.saveSelectedLearners();
-        this.refreshTable();
-        this.updateCounts();
+            if (!res.ok || !data.success) {
+                Utils.showToast(data.message || 'Failed to add learner.', 'error');
+                return;
+            }
 
-        // Clear input
-        input.value = '';
-        Utils.showToast(`${formattedName} added and selected for studies`, 'success');
+            const newLearner = data.learner; // { id, name }
+            this.learners.push(newLearner);
+            this.selectedLearners.push(newLearner.id);
+            this.saveSelectedLearners();
+            this.refreshTable();
+            this.updateCounts();
+            input.value = '';
+            Utils.showToast(`${newLearner.name} added and selected for studies`, 'success');
+        } catch (err) {
+            console.error('Add learner error:', err);
+            Utils.showToast('Server error while adding learner.', 'error');
+        }
     }
 
     deleteLearner(id) {
-        console.log('Delete learner called with ID:', id);
-        
         const learner = this.learners.find(l => l.id === id);
         if (!learner) {
-            console.warn('Learner not found with ID:', id);
             Utils.showToast('Learner not found', 'error');
             return;
         }
 
         this.pendingDeleteId = id;
         const deleteMessage = document.getElementById('delete-message');
-        if (deleteMessage) {
-            deleteMessage.textContent = `Are you sure you want to delete "${learner.name}"?`;
-        }
-        
-        console.log('Showing delete popup for:', learner.name);
+        if (deleteMessage) deleteMessage.textContent = `Are you sure you want to delete "${learner.name}"?`;
         Utils.showPopup('delete-popup');
     }
 
-    confirmDelete() {
-        if (!this.pendingDeleteId) return;
+    async confirmDelete() {
+        if (!this.pendingDeleteId || !this.loggedInUser) return;
 
-        this.learners = this.learners.filter(learner => learner.id !== this.pendingDeleteId);
-        this.selectedLearners = this.selectedLearners.filter(id => id !== this.pendingDeleteId);
-        
-        this.saveLearners();
-        this.saveSelectedLearners();
-        this.refreshTable();
-        this.updateCounts();
-        
-        Utils.hidePopup('delete-popup');
-        Utils.showToast('Learner deleted successfully', 'success');
+        const id = this.pendingDeleteId;
+
+        try {
+            const res = await fetch('./auth-backend/delete-learner.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: this.loggedInUser.email, learner_id: id })
+            });
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                Utils.showToast(data.message || 'Failed to delete learner.', 'error');
+                Utils.hidePopup('delete-popup');
+                this.pendingDeleteId = null;
+                return;
+            }
+
+            this.learners = this.learners.filter(l => l.id !== id);
+            this.selectedLearners = this.selectedLearners.filter(sid => sid !== id);
+            this.saveSelectedLearners();
+            this.refreshTable();
+            this.updateCounts();
+            Utils.hidePopup('delete-popup');
+            Utils.showToast('Learner deleted successfully', 'success');
+        } catch (err) {
+            console.error('Delete learner error:', err);
+            Utils.showToast('Server error while deleting learner.', 'error');
+        }
+
         this.pendingDeleteId = null;
     }
 
     handleSelectLearner(id, isChecked) {
+        const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+
         if (isChecked) {
-            if (!this.selectedLearners.includes(id)) {
-                this.selectedLearners.push(id);
-            }
+            if (!this.selectedLearners.includes(numId)) this.selectedLearners.push(numId);
         } else {
-            this.selectedLearners = this.selectedLearners.filter(selectedId => selectedId !== id);
+            this.selectedLearners = this.selectedLearners.filter(sid => sid !== numId);
         }
         
         this.saveSelectedLearners();
@@ -171,40 +241,32 @@ class LearnHome {
     }
 
     handleSelectAll(isChecked) {
-        if (isChecked) {
-            this.selectedLearners = this.learners.map(learner => learner.id);
-        } else {
-            this.selectedLearners = [];
-        }
-        
+        this.selectedLearners = isChecked ? this.learners.map(l => l.id) : [];
         this.saveSelectedLearners();
         this.refreshTable();
         this.updateCounts();
     }
 
     updateSelectAllCheckbox() {
-        const selectAllCheckbox = document.getElementById('select-all');
-        if (selectAllCheckbox) {
-            selectAllCheckbox.checked = this.learners.length > 0 && 
-                                       this.selectedLearners.length === this.learners.length;
-        }
+        const cb = document.getElementById('select-all');
+        if (cb) cb.checked = this.learners.length > 0 && this.selectedLearners.length === this.learners.length;
     }
 
     startLearning() {
+        if (!this.loggedInUser) {
+            Utils.showToast('Please login first.', 'warning');
+            return;
+        }
+
         if (this.selectedLearners.length === 0) {
             const warningMessage = document.getElementById('warning-message');
-            if (warningMessage) {
-                warningMessage.textContent = 'Please select at least one learner to start learning.';
-            }
+            if (warningMessage) warningMessage.textContent = 'Please select at least one learner to start learning.';
             Utils.showPopup('warning-popup');
             return;
         }
 
-        // Navigate to dialogue page
         if (app) {
             app.showPage('dialogue');
-            
-            // Initialize dialogue page with selected learners
             if (window.dialoguePage) {
                 window.dialoguePage.initializeWithLearners(this.getSelectedLearnerNames());
             }
@@ -213,8 +275,8 @@ class LearnHome {
 
     getSelectedLearnerNames() {
         return this.learners
-            .filter(learner => this.selectedLearners.includes(learner.id))
-            .map(learner => learner.name);
+            .filter(l => this.selectedLearners.includes(l.id))
+            .map(l => l.name);
     }
 
     initializeDataTable() {
@@ -235,11 +297,7 @@ class LearnHome {
                         return `<input type="checkbox" class="learner-checkbox" data-id="${row.id}" ${checked}>`;
                     }
                 },
-                {
-                    title: 'Name',
-                    data: 'name',
-                    className: 'learner-name-cell'
-                },
+                { title: 'Name', data: 'name', className: 'learner-name-cell' },
                 {
                     title: 'Actions',
                     data: null,
@@ -254,7 +312,9 @@ class LearnHome {
             pageLength: 10,
             responsive: true,
             language: {
-                emptyTable: "No learners added yet. Add some learners to get started!",
+                emptyTable: this.loggedInUser
+                    ? "No learners added yet. Add some learners to get started!"
+                    : "Please login to manage your Learning Team.",
                 zeroRecords: "No learners found matching your search.",
                 search: "Search learners:",
                 lengthMenu: "Show _MENU_ learners per page",
@@ -263,11 +323,8 @@ class LearnHome {
                 infoFiltered: "(filtered from _MAX_ total learners)"
             },
             drawCallback: () => {
-                // Reinitialize icons and event listeners after table redraw
                 this.initializeTableEvents();
-                if (typeof lucide !== 'undefined') {
-                    lucide.createIcons();
-                }
+                if (typeof lucide !== 'undefined') lucide.createIcons();
             }
         });
 
@@ -275,158 +332,91 @@ class LearnHome {
     }
 
     initializeTableEvents() {
-        // Remove existing event listeners to prevent duplicates
         $('#learners-table').off('change', '.learner-checkbox');
         $('#learners-table').off('click', '.delete-icon');
-        
-        // Use event delegation for better compatibility with DataTables
+
         $('#learners-table').on('change', '.learner-checkbox', (e) => {
             const id = e.target.getAttribute('data-id');
-            if (id) {
-            this.handleSelectLearner(id, e.target.checked);
-            }
+            if (id) this.handleSelectLearner(parseInt(id, 10), e.target.checked);
         });
 
-        // Delete button events with event delegation
         $('#learners-table').on('click', '.delete-icon', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            
             const target = e.target;
-            const id = target.getAttribute('data-id') || 
-                      target.closest('[data-id]')?.getAttribute('data-id');
-            
-            if (id) {
-                console.log('Delete button clicked for ID:', id);
-                this.deleteLearner(id);
-            } else {
-                console.warn('No ID found for delete button');
-            }
+            const rawId = target.getAttribute('data-id') ||
+                          target.closest('[data-id]')?.getAttribute('data-id');
+            if (rawId) this.deleteLearner(parseInt(rawId, 10));
         });
 
-        // Handle select all checkbox
-        $('#select-all').off('change').on('change', (e) => {
-            this.handleSelectAll(e.target.checked);
-        });
-
-        // Update select all checkbox state
+        $('#select-all').off('change').on('change', (e) => this.handleSelectAll(e.target.checked));
         this.updateSelectAllCheckbox();
     }
 
     refreshTable() {
-        if (this.dataTable) {
-            this.dataTable.clear().rows.add(this.learners).draw();
-        }
+        if (this.dataTable) this.dataTable.clear().rows.add(this.learners).draw();
     }
 
     updateCounts() {
-        const totalElement = document.getElementById('total-learners');
-        const selectedElement = document.getElementById('selected-learners');
-        
-        if (totalElement) {
-            totalElement.textContent = this.learners.length;
-        }
-        
-        if (selectedElement) {
-            selectedElement.textContent = this.selectedLearners.length;
-        }
+        const totalEl = document.getElementById('total-learners');
+        const selectedEl = document.getElementById('selected-learners');
+        if (totalEl) totalEl.textContent = this.learners.length;
+        if (selectedEl) selectedEl.textContent = this.selectedLearners.length;
     }
 
-    async loadLearners() {
-        this.learners = Utils.getFromStorage('learners', []);
-        this.selectedLearners = Utils.getFromStorage('selectedLearners', []);
-        
-        // If no learners exist in storage, load default learners from JSON
-        if (this.learners.length === 0) {
-            await this.loadDefaultLearners();
-        }
-        
-        // Clean up selected learners (remove IDs that no longer exist)
-        this.selectedLearners = this.selectedLearners.filter(id =>
-            this.learners.some(learner => learner.id === id)
-        );
-        
-        // If no learners are selected but learners exist,
-        // select all by default
-        if (this.selectedLearners.length === 0 && this.learners.length > 0) {
-            this.selectedLearners = this.learners.map(learner => learner.id);
-        }
-        
-        this.saveSelectedLearners();
-    }
+    // ─── Server data loading ────────────────────────────
 
-    async loadDefaultLearners() {
+    async loadLearnersFromServer() {
+        if (!this.loggedInUser) return;
+
         try {
-            // Fetch default learners from JSON file
-            const response = await fetch('js/default-learners.json');
-            
-            if (!response.ok) {
-                throw new Error(`Failed to fetch default learners: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            const defaultNames = data.learners || [];
-            
-            if (!Array.isArray(defaultNames) || defaultNames.length === 0) {
-                console.warn('No default learners found in JSON file');
-                return;
-            }
+            const url = `./auth-backend/get-learners.php?email=${encodeURIComponent(this.loggedInUser.email)}`;
+            const res = await fetch(url);
+            const data = await res.json();
 
-            // Create learner objects from default names
-            this.learners = defaultNames.map(name => ({
-                id: Utils.generateId(),
-                name: Utils.formatName(name.trim())
-            }));
-
-            // Select all default learners by default
-            this.selectedLearners = this.learners.map(learner => learner.id);
-
-            // Save to storage
-            this.saveLearners();
-            this.saveSelectedLearners();
-
-            console.log(`Loaded ${this.learners.length} default learners from JSON, all selected by default`);
-        } catch (error) {
-            console.error('Error loading default learners from JSON:', error);
-            
-            // Fallback to JavaScript constant if available (for backward compatibility)
-            if (typeof DEFAULT_LEARNERS !== 'undefined' && Array.isArray(DEFAULT_LEARNERS)) {
-                console.log('Falling back to JavaScript DEFAULT_LEARNERS constant');
-                this.learners = DEFAULT_LEARNERS.map(name => ({
-                    id: Utils.generateId(),
-                    name: Utils.formatName(name.trim())
-                }));
-                this.selectedLearners = this.learners.map(learner => learner.id);
-                this.saveLearners();
-                this.saveSelectedLearners();
-                console.log(`Loaded ${this.learners.length} default learners from JavaScript constant`);
+            if (res.ok && data.success) {
+                this.learners = data.learners; // [{ id, name }, ...]
             } else {
-                console.warn('No default learners available');
+                console.warn('Failed to load learners:', data.message);
+                this.learners = [];
             }
+        } catch (err) {
+            console.error('Error loading learners from server:', err);
+            this.learners = [];
         }
+
+        // Restore selected IDs from localStorage (scoped by user email)
+        const storageKey = `selectedLearners_${this.loggedInUser.email}`;
+        const savedSelected = Utils.getFromStorage(storageKey, []);
+        this.selectedLearners = savedSelected.filter(id =>
+            this.learners.some(l => l.id === id)
+        );
+
+        // If nothing selected but learners exist, select all
+        if (this.selectedLearners.length === 0 && this.learners.length > 0) {
+            this.selectedLearners = this.learners.map(l => l.id);
+        }
+
+        this.saveSelectedLearners();
+        this.refreshTable();
+        this.updateCounts();
     }
 
-    saveLearners() {
-        Utils.saveToStorage('learners', this.learners);
-    }
+    // ─── Persistence (selection only — learners live in DB) ─
 
     saveSelectedLearners() {
-        Utils.saveToStorage('selectedLearners', this.selectedLearners);
+        if (!this.loggedInUser) return;
+        const storageKey = `selectedLearners_${this.loggedInUser.email}`;
+        Utils.saveToStorage(storageKey, this.selectedLearners);
     }
 
-    // Public methods for external access
-    getLearners() {
-        return this.learners;
-    }
+    // ─── Public API ─────────────────────────────────────
 
-    getSelectedLearners() {
-        return this.selectedLearners;
-    }
+    getLearners() { return this.learners; }
+    getSelectedLearners() { return this.selectedLearners; }
 
     setSelectedLearners(ids) {
-        this.selectedLearners = ids.filter(id =>
-            this.learners.some(learner => learner.id === id)
-        );
+        this.selectedLearners = ids.filter(id => this.learners.some(l => l.id === id));
         this.saveSelectedLearners();
         this.refreshTable();
         this.updateCounts();
