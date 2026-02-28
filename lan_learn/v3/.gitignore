@@ -1,0 +1,31 @@
+# Default Learners JSON file (contains user-specific data)
+# Ignore the default learners JSON file
+js/default-learners.json
+**/default-learners.json
+
+# Node modules (if any)
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build files
+dist/
+build/
+
+# Cache files
+.cache/
+*.cache
+
