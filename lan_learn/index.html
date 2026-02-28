@@ -76,6 +76,15 @@
         <div class="home-container">
           <h3 class="home-heading">Speak Freely, Connect Globally</h3>
 
+          <div class="variant-buttons">
+            <button type="button" onclick="alert('Hello world!')">Click Me!</button>
+            <a href="v1/variant.html" class="variant-btn" id="variant1-btn">variant1</a>
+            <a href="v2/variant.html" class="variant-btn" id="variant2-btn">variant2</a>
+            <a href="v3/variant.html" class="variant-btn" id="variant3-btn">variant3</a>
+            <a href="v4/variant.html" class="variant-btn" id="variant4-btn">variant4</a>
+            <a href="v5/variant.html" class="variant-btn" id="variant5-btn">variant5</a>
+          </div>
+
           <div class="topbar">
             <div class="input-container">
               <input
@@ -102,19 +111,19 @@
             </div>
           </div>
 
-          <div class="attendance-summary mt-4 mb-2 flex justify-center gap-4">
+          <div class="attendance-summary mt-4 mb-2 flex flex-col items-start gap-2">
             <div
               class="card bg-white-500 text-black p-2 rounded shadow-md text-center"
             >
               <h4 class="text-lg font-semibold">
-                Total Learners: <span id="total-learners">0</span>
+                Selected Learners: <span id="selected-learners">0</span>
               </h4>
             </div>
             <div
               class="card bg-white-500 text-black p-2 rounded shadow-md text-center"
             >
               <h4 class="text-lg font-semibold">
-                Selected Learners: <span id="selected-learners">0</span>
+                Total Learners: <span id="total-learners">0</span>
               </h4>
             </div>
           </div>
