@@ -1,13 +1,450 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-<body>
-    
-    <h1><a href="variant.html">Go to variant2</a></h1>
- 
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GTongue Learn - Language Learning Platform</title>
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="A standalone language learning application for learning new languages through dialogues" />
+    <meta name="theme-color" content="#10b981" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="GTongue Learn" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json" />
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png" />
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png" />
+    <link rel="stylesheet" href="styles/style.css" />
+    <link rel="stylesheet" href="styles/learn-home.css" />
+    <link rel="stylesheet" href="styles/dialogue.css" />
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <!-- Data Tables CSS -->
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css"
+    />
+    <!-- jQuery and DataTables JS -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="nav-brand">
+        <h2><span class="notranslate">GTongue Learn</span> </h2>
+      </div>
+      <div class="nav-links">
+        <a href="#home" id="nav-home" class="nav-link active">Home</a>
+        <!-- <a href="#dialogue" id="nav-dialogue" class="nav-link">Dialogue</a> -->
+        <a href="#about" id="nav-about" class="nav-link">About</a>
+        <a href="#opensource" id="nav-opensource" class="nav-link">Open Source Rules</a>
+        <a 
+          href="https://github.com/atozats/AtoZ_Services.git" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          id="nav-github" 
+          class="nav-link"
+          style="display: inline-flex; align-items: center; gap: 5px;"
+        >
+          <i data-lucide="github"></i> Go to GitHub
+        </a>
+        <div class="language-selector">
+          <select id="language-select" class="language-dropdown notranslate">
+            <option value="en" selected>🌐 English</option>
+          </select>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div id="app">
+      <!-- Home Page -->
+      <div id="home-page" class="page active">
+        <div class="home-container">
+          <h3 class="home-heading">Speak Freely, Connect Globally</h3>
+
+          <div class="topbar">
+            <div class="input-container">
+              <input
+                type="text"
+                id="learner-input"
+                placeholder="Enter Learner's Name"
+                class="border p-2 rounded mr-2"
+              />
+              <button
+                id="add-learner-btn"
+                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              >
+                Add Learner
+              </button>
+            </div>
+
+            <div class="continue-btn-container">
+              <button
+                id="start-learning-btn"
+                class="bg-green-800 text-white rounded px-4 py-2 hover:bg-green-600"
+              >
+                Start Learning
+              </button>
+            </div>
+          </div>
+
+          <div class="attendance-summary mt-4 mb-2 flex justify-center gap-4">
+            <div
+              class="card bg-white-500 text-black p-2 rounded shadow-md text-center"
+            >
+              <h4 class="text-lg font-semibold">
+                Total Learners: <span id="total-learners">0</span>
+              </h4>
+            </div>
+            <div
+              class="card bg-white-500 text-black p-2 rounded shadow-md text-center"
+            >
+              <h4 class="text-lg font-semibold">
+                Selected Learners: <span id="selected-learners">0</span>
+              </h4>
+            </div>
+          </div>
+
+          <!-- Learners Table -->
+          <div class="learners-table-container">
+            <table id="learners-table" class="display" style="width: 100%">
+              <thead>
+                <tr>
+                  <th><input type="checkbox" id="select-all" /></th>
+                  <th>Name</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dialogue Page -->
+      <div id="dialogue-page" class="page">
+        <div class="dialogue-container">
+          <!-- Go Back Button -->
+          <button class="go-back-button" id="go-back-btn">
+            <i data-lucide="arrow-left"></i>
+          </button>
+
+          <!-- About Page Button -->
+          <button class="about-page-button" id="about-btn">
+            <i data-lucide="info"></i>
+          </button>
+
+          <h1 class="page-title">
+            Language Learning - <span id="current-language">English</span>
+          </h1>
+
+          <!-- Conversation Selector -->
+          <select class="conversation-selector" id="conversation-selector">
+            <option value="0">Select Conversation</option>
+          </select>
+
+          <!-- Speed Control -->
+          <div class="speed-control" id="speed-control">
+            <label for="speed-slider" class="speed-label">Auto speed</label>
+            <input
+              type="range"
+              id="speed-slider"
+              class="speed-slider"
+              min="1000"
+              max="5000"
+              step="250"
+              value="3000"
+            />
+            <span id="speed-value" class="speed-value">3.0s</span>
+          </div>
+
+          <!-- Conversation Block with Navigation Buttons -->
+          <div class="conversation-block">
+            <!-- Navigation Buttons on the right side -->
+            <div class="btn-cons">
+              <button class="btn-up-dw" id="prev-line-btn">
+                <i data-lucide="arrow-up"></i>
+              </button>
+              <button class="btn-up-dw" id="next-line-btn">
+                <i data-lucide="arrow-down"></i>
+              </button>
+              <button class="btn-up-dw btn-toggle-auto" id="toggle-auto-advance-btn" title="Pause auto scroll" aria-label="Pause auto scroll">
+                <i data-lucide="pause"></i>
+              </button>
+            </div>
+            <div class="script-text" id="script-text">
+              <div class="loading">Loading dialogue...</div>
+            </div>
+          </div>
+
+          <!-- Button Container -->
+          <div class="button-con">
+            <button id="prev-conversation-btn">Previous conversation</button>
+            <button id="next-conversation-btn">Next conversation</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- About Page -->
+      <div id="about-page" class="page">
+        <div class="about-container">
+          <button class="go-back-button" id="about-back-btn">
+            <i data-lucide="arrow-left"></i>
+          </button>
+          <div class="about-content">
+            <h1 class="text-3xl font-extrabold text-center text-green-700 mb-6">
+              About This Language Learning Page
+            </h1>
+            <p class="text-gray-700 mb-4">
+              This Language Learning page allows you to learn a new language by
+              going through dialogues. You can select a conversation from the
+              dropdown, and the dialogue will be displayed. Use the navigation
+              buttons to move between conversations and lines within a
+              conversation.
+            </p>
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">Features</h2>
+            <ul class="list-disc list-inside text-gray-700 mb-4">
+              <li>
+                <strong class="font-bold text-purple-700"
+                  >Dynamic Content:</strong
+                >
+                Dialogues are dynamically fetched based on the selected
+                language.
+              </li>
+              <li>
+                <strong class="font-bold text-purple-700"
+                  >Learner Names:</strong
+                >
+                Dialogues are personalized by including learner names.
+              </li>
+              <li>
+                <strong class="font-bold text-purple-700">Navigation:</strong>
+                Users can navigate between different conversations and lines.
+              </li>
+            </ul>
+
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">
+              Available Languages
+            </h2>
+            <p class="text-gray-700 mb-4">
+              The application currently supports:
+              <span class="text-green-700 font-bold">English</span>
+            </p>
+
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">
+              Invitation to Developers
+            </h2>
+            <p class="text-gray-700 mb-4">
+              We invite developers passionate about language learning to
+              collaborate with us.
+            </p>
+            <p class="text-center">
+              <a
+                href="https://github.com/atozats/AtoZ_Services.git"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-orange-500 hover:underline"
+              >
+                Visit our GitHub repository
+              </a>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Open Source Rules Page -->
+      <div id="opensource-page" class="page">
+        <div class="about-container">
+          <button class="go-back-button" id="opensource-back-btn">
+            <i data-lucide="arrow-left"></i>
+          </button>
+          <div class="about-content">
+            <h1 class="text-3xl font-extrabold text-center text-green-700 mb-6">
+              Open Source Rules and Regulations
+            </h1>
+            
+            <div class="text-gray-700 mb-6">
+              <h2 class="text-2xl font-bold text-blue-700 mb-4">1. License</h2>
+              <p class="mb-4">
+                This project is open source and available under the MIT License. 
+                You are free to use, modify, and distribute this software in 
+                accordance with the license terms.
+              </p>
+            </div>
+
+            <div class="text-gray-700 mb-6">
+              <h2 class="text-2xl font-bold text-blue-700 mb-4">2. Contribution Guidelines</h2>
+              <ul class="list-disc list-inside mb-4">
+                <li class="mb-2">
+                  <strong class="font-bold text-purple-700">Code Quality:</strong>
+                  All contributions must follow the existing code style and 
+                  include appropriate comments.
+                </li>
+                <li class="mb-2">
+                  <strong class="font-bold text-purple-700">Testing:</strong>
+                  New features should include tests to ensure functionality 
+                  and prevent regressions.
+                </li>
+                <li class="mb-2">
+                  <strong class="font-bold text-purple-700">Documentation:</strong>
+                  Update documentation for any new features or changes.
+                </li>
+                <li class="mb-2">
+                  <strong class="font-bold text-purple-700">Pull Requests:</strong>
+                  Submit pull requests with clear descriptions of changes and 
+                  their purpose.
+                </li>
+              </ul>
+            </div>
+
+            <div class="text-gray-700 mb-6">
+              <h2 class="text-2xl font-bold text-blue-700 mb-4">3. Code of Conduct</h2>
+              <ul class="list-disc list-inside mb-4">
+                <li class="mb-2">Be respectful and inclusive in all interactions.</li>
+                <li class="mb-2">Welcome newcomers and help them get started.</li>
+                <li class="mb-2">Focus on constructive feedback and collaboration.</li>
+                <li class="mb-2">Respect different viewpoints and experiences.</li>
+              </ul>
+            </div>
+
+            <div class="text-gray-700 mb-6">
+              <h2 class="text-2xl font-bold text-blue-700 mb-4">4. Reporting Issues</h2>
+              <p class="mb-4">
+                When reporting bugs or requesting features, please provide:
+              </p>
+              <ul class="list-disc list-inside mb-4">
+                <li class="mb-2">Clear description of the issue or feature request</li>
+                <li class="mb-2">Steps to reproduce (for bugs)</li>
+                <li class="mb-2">Expected vs. actual behavior</li>
+                <li class="mb-2">Environment details (browser, OS, etc.)</li>
+              </ul>
+            </div>
+
+            <div class="text-gray-700 mb-6">
+              <h2 class="text-2xl font-bold text-blue-700 mb-4">5. Intellectual Property</h2>
+              <p class="mb-4">
+                By contributing to this project, you agree that your contributions 
+                will be licensed under the same license as the project (MIT License). 
+                You retain copyright to your contributions but grant the project 
+                maintainers the right to use, modify, and distribute your work.
+              </p>
+            </div>
+
+            <div class="text-gray-700 mb-6">
+              <h2 class="text-2xl font-bold text-blue-700 mb-4">6. Forking and Distribution</h2>
+              <p class="mb-4">
+                You are free to fork this repository and create your own versions. 
+                However, please:
+              </p>
+              <ul class="list-disc list-inside mb-4">
+                <li class="mb-2">Maintain attribution to the original project</li>
+                <li class="mb-2">Include the original license file</li>
+                <li class="mb-2">Clearly indicate any modifications you've made</li>
+                <li class="mb-2">Consider contributing improvements back to the main project</li>
+              </ul>
+            </div>
+
+            <div class="text-gray-700 mb-6">
+              <h2 class="text-2xl font-bold text-blue-700 mb-4">7. Security</h2>
+              <p class="mb-4">
+                If you discover a security vulnerability, please report it 
+                responsibly by contacting the project maintainers directly 
+                rather than creating a public issue.
+              </p>
+            </div>
+
+            <div class="text-gray-700 mb-6">
+              <h2 class="text-2xl font-bold text-blue-700 mb-4">8. Community Guidelines</h2>
+              <ul class="list-disc list-inside mb-4">
+                <li class="mb-2">Be patient and helpful with other contributors</li>
+                <li class="mb-2">Share knowledge and help others learn</li>
+                <li class="mb-2">Celebrate successes and learn from failures together</li>
+                <li class="mb-2">Maintain a positive and welcoming environment</li>
+              </ul>
+            </div>
+
+            <div class="text-center mt-8">
+              <p class="text-gray-700 mb-4">
+                For more information, visit our 
+                <a
+                  href="https://github.com/atozats/AtoZ_Services.git"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-orange-500 hover:underline font-bold"
+                >
+                  GitHub Repository
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup Modals -->
+    <div id="warning-popup" class="popup-overlay">
+      <div class="popup-content">
+        <p id="warning-message">Please select at least one learner.</p>
+        <button id="warning-ok-btn" class="popup-btn">OK</button>
+      </div>
+    </div>
+
+    <div id="delete-popup" class="popup-overlay">
+      <div class="popup-content">
+        <p id="delete-message">Are you sure you want to delete this learner?</p>
+        <div class="popup-buttons">
+          <button id="delete-confirm-btn" class="popup-btn delete-btn">
+            Yes
+          </button>
+          <button id="delete-cancel-btn" class="popup-btn cancel-btn">
+            No
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PWA Install Popup -->
+    <div id="pwa-install-popup" class="popup-overlay" style="opacity: 0;">
+      <div class="popup-content">
+        <div style="text-align: center; margin-bottom: 1rem;">
+          <div style="font-size: 3rem; margin-bottom: 0.5rem;">📱</div>
+          <h3 style="margin: 0.5rem 0; color: #10b981; font-size: 1.5rem;">Install GTongue Learn</h3>
+        </div>
+        <p id="pwa-install-message" style="margin: 1rem 0; color: #666;">
+          Install this app on your device for a better experience. You can use it offline and access it directly from your home screen!
+        </p>
+        <div class="popup-buttons">
+          <button id="pwa-install-btn" class="popup-btn" style="background-color: #10b981; color: white; flex: 1;">
+            <i data-lucide="download" style="width: 18px; height: 18px; margin-right: 5px;"></i>
+            Install App
+          </button>
+          <button id="pwa-dismiss-btn" class="popup-btn cancel-btn" style="flex: 1;">
+            Maybe Later
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Google Translate Element (hidden) -->
+    <div id="google_translate_element" style="display: none"></div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <script src="js/translation-service.js"></script>
+    <script src="js/default-learners.js"></script>
+    <script src="js/App.js"></script>
+    <script src="js/learn-home.js"></script>
+    <script src="js/dialogue-data.js"></script>
+    <script src="js/dialogue.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/pwa-install.js"></script>
+  </body>
 </html>
