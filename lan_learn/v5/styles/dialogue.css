@@ -1,0 +1,545 @@
+/* Dialogue Page Styles */
+.dialogue-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: calc(100vh - 80px);
+    padding: 20px;
+    box-sizing: border-box;
+    position: relative;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Page Title */
+.page-title {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Navigation Buttons Container */
+.btn-cons {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 10;
+}
+
+.btn-up-dw {
+    background-color: #3498db;
+    color: #ffffff;
+    border: none;
+    border-radius: 50%;
+    padding: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    width: 40px;
+    height: 40px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-toggle-auto {
+    background-color: #10b981;
+}
+
+.btn-toggle-auto.is-paused {
+    background-color: #6b7280;
+}
+
+.btn-up-dw:hover {
+    background-color: #2980b9 !important;
+    transform: scale(1.05);
+}
+
+.btn-up-dw:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.btn-up-dw:disabled:hover {
+    transform: none;
+}
+
+/* Go Back Button */
+.go-back-button {
+    position: absolute;
+    top: 1em;
+    left: 0.5em;
+    background-color: transparent !important;
+    color: black;
+    cursor: pointer;
+    border: none;
+    padding: 10px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease;
+}
+
+.go-back-button:hover {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    font-weight: bold;
+}
+
+/* About Page Button */
+.about-page-button {
+    position: absolute;
+    top: 1em;
+    right: 0.5em;
+    background-color: transparent !important;
+    color: black;
+    cursor: pointer;
+    border: none;
+    padding: 10px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease;
+}
+
+.about-page-button:hover {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    font-weight: bold;
+}
+
+/* Conversation Selector */
+.conversation-selector {
+    width: 200px;
+    padding: 10px;
+    font-size: 1rem;
+    border: 2px solid #ffcc00;
+    border-radius: 8px;
+    background-color: #fffbe6;
+    color: #333;
+    margin-bottom: 20px;
+    cursor: pointer;
+}
+
+.conversation-selector:hover {
+    border-color: #ffa500;
+}
+
+/* Speed Control */
+.speed-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+
+.speed-label {
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+}
+
+.speed-slider {
+    width: 220px;
+}
+
+.speed-value {
+    min-width: 44px;
+    text-align: right;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+/* Conversation Block */
+.conversation-block {
+    position: relative;
+    height: 55vh;
+    width: 90%;
+    max-width: 800px;
+    background-color: #fff;
+    padding: 20px;
+    padding-right: 80px; /* Add space for navigation buttons */
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.script-text {
+    font-family: "Courier New", monospace;
+    font-size: 1.5rem;
+    color: #34495e;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+/* Highlighted Line */
+.highlighted-line {
+    background-color: #000;
+    color: #fff;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 5px 0;
+    font-size: 1.4em;
+    box-shadow: 0 4px 8px rgba(108, 105, 105, 0.2);
+    transform: scale(0.9);
+    transition: all 0.3s ease;
+    white-space: normal;
+    word-wrap: break-word;
+    max-width: fit-content;
+    display: inline-block;
+    z-index: 999;
+}
+
+.highlighted-line .learner-name {
+    color: #ff6b6b !important;
+    font-weight: bold;
+}
+
+.highlighted-line .learner-name strong {
+    color: #ff6b6b !important;
+}
+
+.highlighted-line .conversation-text {
+    color: white !important;
+}
+
+/* Conversation Number Styling (e.g., "Conversation 1", "Conversation 6") - Smaller font */
+.conversation-number {
+    color: #333 !important;
+    padding: 8px 12px !important;
+    border-radius: 4px !important;
+    margin: 8px 0 !important;
+    font-size: 1.2rem !important;
+    font-weight: 600 !important;
+    display: inline-block !important;
+}
+
+.highlighted-line.conversation-number {
+    background-color: #000 !important;
+    color: #fff !important;
+    font-size: 1.4rem !important;
+    font-weight: 600 !important;
+}
+
+/* Conversation Title Styling (e.g., "Basic Introduction and Greetings") - Larger font, bold, underline */
+.conversation-title {
+    color: #202ccc !important;
+    padding: 12px 16px !important;
+    border-radius: 6px !important;
+    margin: 10px 0 !important;
+    font-size: 1.8rem !important;
+    font-weight: bold !important;
+    text-decoration: underline !important;
+    display: inline-block !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.highlighted-line.conversation-title {
+    background-color: #000 !important;
+    color: #fff !important;
+    font-size: 2rem !important;
+    font-weight: bold !important;
+    text-decoration: underline !important;
+}
+
+/* Button Container */
+.button-con {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+    margin-bottom: 100px;
+}
+
+.button-con button {
+    padding: 10px 20px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    background-color: #ffcc00;
+    color: #333;
+}
+
+.button-con button:hover {
+    background-color: #e6b800;
+}
+
+.button-con button:disabled {
+    background-color: #ccc;
+    color: #666;
+    cursor: not-allowed;
+}
+
+/* About Page Styles */
+.about-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+    position: relative;
+}
+
+.about-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.text-3xl {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+}
+
+.font-extrabold {
+    font-weight: 800;
+}
+
+.text-green-700 {
+    color: #15803d;
+}
+
+.text-2xl {
+    font-size: 1.5rem;
+    line-height: 2rem;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.text-blue-700 {
+    color: #1d4ed8;
+}
+
+.text-gray-700 {
+    color: #374151;
+}
+
+.text-purple-700 {
+    color: #7c3aed;
+}
+
+.list-disc {
+    list-style-type: disc;
+}
+
+.list-inside {
+    list-style-position: inside;
+}
+
+.text-orange-500 {
+    color: #f97316;
+}
+
+.hover\:underline:hover {
+    text-decoration: underline;
+}
+
+.about-content p {
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+.about-content h1 {
+    margin-bottom: 1.5rem;
+}
+
+.about-content h2 {
+    margin-bottom: 1rem;
+    margin-top: 1.5rem;
+}
+
+.about-content ul {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+}
+
+.about-content li {
+    margin-bottom: 0.5rem;
+}
+
+.about-content a {
+    color: #f97316;
+    text-decoration: none;
+    transition: text-decoration 0.3s ease;
+}
+
+.about-content a:hover {
+    text-decoration: underline;
+}
+
+/* Media Queries for Responsiveness */
+@media (max-width: 768px) {
+    .page-title {
+        font-size: 1.2rem;
+        margin-top: 30px;
+    }
+    
+    .dialogue-container {
+        padding: 10px;
+    }
+    
+    .conversation-block {
+        height: 50vh;
+        padding: 15px;
+        padding-right: 70px; /* Adjust space for navigation buttons on mobile */
+        width: 95%;
+    }
+    
+    .script-text {
+        font-size: 1rem;
+    }
+    
+    .conversation-number {
+        font-size: 1rem !important;
+        padding: 6px 10px !important;
+    }
+    
+    .highlighted-line.conversation-number {
+        font-size: 1.2rem !important;
+    }
+    
+    .conversation-title {
+        font-size: 1.5rem !important;
+        padding: 10px 14px !important;
+    }
+    
+    .highlighted-line.conversation-title {
+        font-size: 1.7rem !important;
+    }
+    
+    .go-back-button,
+    .about-page-button {
+        width: 35px;
+        height: 35px;
+        padding: 5px;
+    }
+    
+    .conversation-selector {
+        width: 150px;
+        font-size: 0.9rem;
+    }
+    
+    .btn-up-dw {
+        width: 30px;
+        height: 30px;
+        font-size: 10px;
+    }
+    
+    .btn-cons {
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        gap: 5px;
+    }
+    
+    .button-con {
+        flex-direction: row;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .button-con button {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
+    
+    .about-container {
+        padding: 1rem;
+    }
+    
+    .about-content {
+        padding: 1.5rem;
+    }
+    
+    .text-3xl {
+        font-size: 1.5rem;
+    }
+    
+    .text-2xl {
+        font-size: 1.25rem;
+    }
+    
+    .conversation-number {
+        font-size: 0.9rem !important;
+        padding: 5px 8px !important;
+    }
+    
+    .highlighted-line.conversation-number {
+        font-size: 1.1rem !important;
+    }
+    
+    .conversation-title {
+        font-size: 1.4rem !important;
+        padding: 10px 12px !important;
+    }
+    
+    .highlighted-line.conversation-title {
+        font-size: 1.6rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .page-title {
+        font-size: 1rem;
+    }
+    
+    .conversation-block {
+        height: 40vh;
+        padding: 10px;
+        padding-right: 50px; /* Adjust space for navigation buttons on smaller screens */
+    }
+    
+    .script-text {
+        font-size: 0.9rem;
+    }
+    
+    .conversation-selector {
+        width: 120px;
+        font-size: 0.8rem;
+        padding: 8px;
+    }
+    
+    .btn-up-dw {
+        width: 35px;
+        height: 35px;
+        font-size: 12px;
+    }
+    
+    .button-con button {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+    
+    .about-content {
+        padding: 1rem;
+    }
+    
+    .text-3xl {
+        font-size: 1.25rem;
+    }
+    
+    .text-2xl {
+        font-size: 1.125rem;
+    }
+} 
