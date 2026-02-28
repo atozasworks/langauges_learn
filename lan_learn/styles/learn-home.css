@@ -28,7 +28,7 @@
 }
 
 .variant-btn {
-    background-color: #1e3a5f;
+    background-color: #14532d;
     color: #ffffff;
     padding: 0.5rem 1.5rem;
     border: none;
@@ -40,7 +40,7 @@
 }
 
 .variant-btn:hover {
-    background-color: #2d5a8e;
+    background-color: #166534;
     transform: translateY(-2px);
 }
 
