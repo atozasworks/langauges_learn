@@ -1,0 +1,34 @@
+# Auth backend local config (secrets)
+lan_learn/auth-backend/db-config.local.php
+lan_learn/auth-backend/smtp-config.local.php
+lan_learn/auth-backend/google-config.local.php
+**/db-config.local.php
+**/smtp-config.local.php
+**/google-config.local.php
+
+# Node modules (if any)
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build files
+dist/
+build/
+
+# Cache files
+.cache/
+*.cache
+
