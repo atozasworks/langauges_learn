@@ -10,6 +10,10 @@ Person 1: Good morning! Had breakfast?
 Person 2: Yes, had idli and chutney. You?
 Person 3: I had dosa today.
 Person 4: Same here. Nothing like hot dosa in the morning!
+Person 1: Hi, everyone! How are you all?
+Person 2: Hey! I'm good. How about you?
+Person 3: Hello! I'm fine too.
+Person 4: Hi! All good here. Long time no see!
 
 
 Conversation 2 
@@ -18,6 +22,10 @@ Person 1: Hi, everyone! How are you all?
 Person 2: Hey! I'm good. How about you?
 Person 3: Hello! I'm fine too.
 Person 4: Hi! All good here. Long time no see!
+Person 1: Hello! Where are you from?
+Person 2: I'm from Chennai. You?
+Person 3: Bangalore here.
+Person 4: I'm from Hyderabad. Nice to meet you all!
 
 
 
@@ -27,6 +35,8 @@ Person 1: Hello! Where are you from?
 Person 2: I'm from Chennai. You?
 Person 3: Bangalore here.
 Person 4: I'm from Hyderabad. Nice to meet you all!
+Person 2: I'm Jhon. And you?
+Person 1: I'm Alice. Nice to meet you!
 
 
 
