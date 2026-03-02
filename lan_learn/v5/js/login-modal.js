@@ -289,33 +289,16 @@
   }
 
   async function saveGoogleLoginToDatabase(accessToken) {
-    try {
-      const response = await fetch("./auth-backend/save-google-login.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken })
-      });
-      // Try to read response as text first for debugging
-      const responseText = await response.text();
-      console.log("save-google-login response:", response.status, responseText);
-      
-      let payload;
-      try {
-        payload = JSON.parse(responseText);
-      } catch (parseErr) {
-        console.warn("Server returned non-JSON:", responseText);
-        return { success: true, message: "DB save skipped — server error." };
-      }
-      
-      if (!response.ok || !payload.success) {
-        console.warn("DB save issue:", payload.message || response.status);
-      }
-      return payload;
-    } catch (err) {
-      // PHP backend not available (e.g. Live Server) — skip DB save silently
-      console.warn("DB save skipped (no PHP backend):", err.message);
-      return { success: true, message: "DB save skipped — no backend." };
+    const response = await fetch("./auth-backend/save-google-login.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.message || "Failed to save Google login.");
     }
+    return payload;
   }
 
   async function startGooglePopupLogin() {
@@ -344,8 +327,7 @@
       });
 
       const profile = await fetchGoogleUserProfile(tokenResponse.access_token);
-      // Try to save to DB but don't block login if it fails
-      saveGoogleLoginToDatabase(tokenResponse.access_token);
+      await saveGoogleLoginToDatabase(tokenResponse.access_token);
       googleProfile = profile;
 
       // Auto-fetch name from Google profile
