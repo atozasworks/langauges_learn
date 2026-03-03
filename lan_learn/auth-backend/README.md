@@ -25,12 +25,16 @@ The `users` table is created automatically on first use.
 
 1. In [Google Cloud Console](https://console.cloud.google.com/) create a project and enable **Google+ API** / **People API**.
 2. Create **OAuth 2.0 Client ID** (Web application).
-3. Set **Authorized redirect URI** to: `https://your-domain.com/lan_learn/auth-backend/google-callback.php`
+3. Set **Authorized redirect URI** to your exact callback URL, for example:
+	- Production: `https://your-domain.com/lan_learn/auth-backend/google-callback.php`
+	- Local: `http://localhost/lan_learn/auth-backend/google-callback.php`
+	- Local with port: `http://localhost:8080/lan_learn/auth-backend/google-callback.php`
 4. Copy Client ID and Client Secret into env or `google-config.local.php`:
 
 ```bash
 cp google-config.example.php google-config.local.php
 # Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (or in .env)
+# Optional: set GOOGLE_REDIRECT_URI if your local callback URL must be fixed
 ```
 
 ### 3. SMTP for OTP

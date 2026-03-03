@@ -39,6 +39,56 @@
         if (el) el.textContent = msg || '';
     }
 
+    function getGoogleAuthErrorMessage(error, reason) {
+        if (error === 'google_not_configured') {
+            if (reason === 'missing_client_id') {
+                return 'Google login is not configured on this server (missing Client ID).';
+            }
+            return 'Google login is not configured on this server.';
+        }
+
+        if (error === 'google_login_failed') {
+            switch (reason) {
+                case 'oauth_denied':
+                    return 'Google sign-in was cancelled. Please try again and allow access.';
+                case 'missing_code_or_state':
+                    return 'Google sign-in failed: invalid callback response.';
+                case 'invalid_oauth_state':
+                    return 'Google sign-in failed due to session mismatch. Please try again.';
+                case 'token_request_failed':
+                    return 'Google sign-in failed while requesting access token.';
+                case 'missing_access_token':
+                    return 'Google sign-in failed: access token was not returned.';
+                case 'userinfo_request_failed':
+                    return 'Google sign-in failed while fetching Google profile.';
+                case 'missing_user_profile':
+                    return 'Google sign-in failed: Google account email/profile is unavailable.';
+                default:
+                    return 'Google sign-in failed. Please try again.';
+            }
+        }
+
+        return '';
+    }
+
+    function handleAuthErrorFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const error = params.get('error') || '';
+        const reason = params.get('reason') || '';
+        const message = getGoogleAuthErrorMessage(error, reason);
+
+        if (!message) return;
+
+        showLoginModal();
+        setLoginError(message);
+
+        params.delete('error');
+        params.delete('reason');
+        const query = params.toString();
+        const cleanUrl = window.location.pathname + (query ? '?' + query : '') + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+    }
+
     function setSendOtpState(sent) {
         const sentMsg = document.getElementById('login-otp-sent-msg');
         const otpLabel = document.getElementById('otp-label');
@@ -172,8 +222,12 @@
 
     // On load: check session and update nav button
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', checkAuth);
+        document.addEventListener('DOMContentLoaded', function () {
+            handleAuthErrorFromQuery();
+            checkAuth();
+        });
     } else {
+        handleAuthErrorFromQuery();
         checkAuth();
     }
 

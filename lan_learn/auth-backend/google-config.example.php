@@ -6,5 +6,5 @@
 return [
     'client_id'     => getenv('GOOGLE_CLIENT_ID') ?: '',
     'client_secret' => getenv('GOOGLE_CLIENT_SECRET') ?: '',
-    'redirect_uri'  => null, // Set in code from request base URL
+    'redirect_uri'  => getenv('GOOGLE_REDIRECT_URI') ?: '', // Optional override; leave empty to auto-build from current host/path
 ];
