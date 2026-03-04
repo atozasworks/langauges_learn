@@ -295,16 +295,26 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accessToken })
       });
-      const payload = await response.json();
+      // Try to read response as text first for debugging
+      const responseText = await response.text();
+      console.log("save-google-login response:", response.status, responseText);
+      
+      let payload;
+      try {
+        payload = JSON.parse(responseText);
+      } catch (parseErr) {
+        console.warn("Server returned non-JSON:", responseText);
+        return { success: true, message: "DB save skipped — server error." };
+      }
+      
       if (!response.ok || !payload.success) {
-        console.warn("Backend save skipped:", payload.message || response.status);
-        return { success: false };
+        console.warn("DB save issue:", payload.message || response.status);
       }
       return payload;
     } catch (err) {
-      // Backend unavailable (e.g. no PHP server) — login still works client-side
-      console.warn("Backend save unavailable, continuing with client-side login:", err.message);
-      return { success: false };
+      // PHP backend not available (e.g. Live Server) — skip DB save silently
+      console.warn("DB save skipped (no PHP backend):", err.message);
+      return { success: true, message: "DB save skipped — no backend." };
     }
   }
 
@@ -334,7 +344,8 @@
       });
 
       const profile = await fetchGoogleUserProfile(tokenResponse.access_token);
-      await saveGoogleLoginToDatabase(tokenResponse.access_token);
+      // Try to save to DB but don't block login if it fails
+      saveGoogleLoginToDatabase(tokenResponse.access_token);
       googleProfile = profile;
 
       // Auto-fetch name from Google profile
