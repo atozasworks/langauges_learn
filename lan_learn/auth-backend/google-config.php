@@ -6,7 +6,7 @@ function getGoogleOAuthConfig(): array
     $clientSecretFromEnv = getenv('GOOGLE_CLIENT_SECRET') ?: '';
     $redirectUriFromEnv = getenv('GOOGLE_REDIRECT_URI') ?: '';
 
-    $defaultClientId = '517209799545-dtdrnpunls3uvte15oirf9rg5qrnlo1n.apps.googleusercontent.com';
+    $defaultClientId = '444024521791-26vj3nj553l540pjhofsgnk9tv2du5gh.apps.googleusercontent.com';
 
     // Build redirect URI from current host if env is not configured.
     if ($redirectUriFromEnv === '') {

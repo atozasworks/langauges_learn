@@ -28,7 +28,7 @@
 
   const googleClientId =
     googleOption.getAttribute("data-client-id") ||
-    "517209799545-dtdrnpunls3uvte15oirf9rg5qrnlo1n.apps.googleusercontent.com";
+    "444024521791-26vj3nj553l540pjhofsgnk9tv2du5gh.apps.googleusercontent.com";
 
   // ─── Check if user is already logged in (sessionStorage) ───
   const savedUser = sessionStorage.getItem("loggedInUser");
@@ -289,16 +289,23 @@
   }
 
   async function saveGoogleLoginToDatabase(accessToken) {
-    const response = await fetch("./auth-backend/save-google-login.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accessToken })
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.message || "Failed to save Google login.");
+    try {
+      const response = await fetch("./auth-backend/save-google-login.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken })
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        console.warn("Backend save skipped:", payload.message || response.status);
+        return { success: false };
+      }
+      return payload;
+    } catch (err) {
+      // Backend unavailable (e.g. no PHP server) — login still works client-side
+      console.warn("Backend save unavailable, continuing with client-side login:", err.message);
+      return { success: false };
     }
-    return payload;
   }
 
   async function startGooglePopupLogin() {
