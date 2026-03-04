@@ -1,26 +1,26 @@
 <?php
+require_once __DIR__ . '/env-loader.php';
+loadEnv(__DIR__ . '/../.env');
 
 function getGoogleOAuthConfig(): array
 {
-    $clientIdFromEnv = getenv('GOOGLE_CLIENT_ID') ?: '';
-    $clientSecretFromEnv = getenv('GOOGLE_CLIENT_SECRET') ?: '';
-    $redirectUriFromEnv = getenv('GOOGLE_REDIRECT_URI') ?: '';
-
-    $defaultClientId = '444024521791-26vj3nj553l540pjhofsgnk9tv2du5gh.apps.googleusercontent.com';
+    $clientId     = env('GOOGLE_CLIENT_ID');
+    $clientSecret = env('GOOGLE_CLIENT_SECRET');
+    $redirectUri  = env('GOOGLE_REDIRECT_URI');
 
     // Build redirect URI from current host if env is not configured.
-    if ($redirectUriFromEnv === '') {
+    if ($redirectUri === '') {
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $redirectUriFromEnv = $scheme . '://' . $host . '/lan_learn/auth-backend/google-callback.php';
+        $redirectUri = $scheme . '://' . $host . '/lan_learn/auth-backend/google-callback.php';
     }
 
     return [
-        'client_id' => $clientIdFromEnv !== '' ? $clientIdFromEnv : $defaultClientId,
-        'client_secret' => $clientSecretFromEnv,
-        'redirect_uri' => $redirectUriFromEnv,
-        'auth_url' => 'https://accounts.google.com/o/oauth2/v2/auth',
-        'token_url' => 'https://oauth2.googleapis.com/token',
-        'userinfo_url' => 'https://www.googleapis.com/oauth2/v3/userinfo'
+        'client_id'     => $clientId,
+        'client_secret' => $clientSecret,
+        'redirect_uri'  => $redirectUri,
+        'auth_url'      => 'https://accounts.google.com/o/oauth2/v2/auth',
+        'token_url'     => 'https://oauth2.googleapis.com/token',
+        'userinfo_url'  => 'https://www.googleapis.com/oauth2/v3/userinfo'
     ];
 }
