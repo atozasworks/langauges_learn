@@ -1,0 +1,39 @@
+<?php
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
+$out = ['v'=>3];
+
+$f1 = __DIR__ . '/db-config.local.php';
+if (is_file($f1)) {
+    $c = require $f1;
+    if (is_array($c)) {
+        if (isset($c['password'])) { $c['password'] = '***(' . strlen($c['password']) . ')'; }
+        $out['db'] = $c;
+    }
+} else { $out['db'] = 'MISSING'; }
+
+$f2 = __DIR__ . '/smtp-config.local.php';
+if (is_file($f2)) {
+    $c2 = require $f2;
+    if (is_array($c2)) {
+        if (isset($c2['password'])) { $c2['password'] = '***(' . strlen($c2['password']) . ')'; }
+        $out['smtp'] = $c2;
+    }
+} else { $out['smtp'] = 'MISSING'; }
+
+$envFile = $_SERVER['DOCUMENT_ROOT'] . '/.env';
+if (is_file($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $masked = [];
+    foreach ($lines as $l) {
+        if (preg_match('/password|secret|key/i', $l) && strpos($l, '=') !== false) {
+            $p = explode('=', $l, 2);
+            $masked[] = $p[0] . '=***';
+        } else {
+            $masked[] = $l;
+        }
+    }
+    $out['env'] = $masked;
+} else { $out['env'] = 'NO .env'; }
+
+echo json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

@@ -45,12 +45,23 @@ try {
 
 } catch (Throwable $e) {
     http_response_code(500);
-    $resp = ['success' => false, 'message' => 'Failed to send OTP.'];
+    
+    // Classify the error for a useful client message
+    $msg = $e->getMessage();
+    if (stripos($msg, 'Access denied') !== false || stripos($msg, 'SQLSTATE') !== false) {
+        $clientMsg = 'Database connection failed. Please contact support.';
+    } elseif (stripos($msg, 'SMTP') !== false || stripos($msg, 'fsockopen') !== false) {
+        $clientMsg = 'Email service unavailable. Please try again later.';
+    } else {
+        $clientMsg = 'Failed to send OTP. Please try again.';
+    }
 
-    // Show error detail on localhost
+    $resp = ['success' => false, 'message' => $clientMsg];
+
+    // Show full error detail on localhost
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     if (in_array($ip, ['127.0.0.1', '::1'], true)) {
-        $resp['error_detail'] = $e->getMessage();
+        $resp['error_detail'] = $msg;
         $resp['error_file']   = $e->getFile() . ':' . $e->getLine();
     }
 

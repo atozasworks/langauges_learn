@@ -1,16 +1,56 @@
 <?php
 /**
- * Database helper for XAMPP MySQL (phpMyAdmin).
- * Auto-creates database `lan_learn_auth` and tables `login_audit`, `otp_codes`.
+ * Database helper — works with both XAMPP (local) and Hostinger (live).
+ * Auto-creates tables `login_audit`, `otp_codes`, `learning_team`.
+ *
+ * Config priority:
+ *   1. db-config.local.php  (per-environment file, not committed)
+ *   2. Environment variables DB_HOST, DB_NAME, DB_USER, DB_PASSWORD
+ *   3. .env file in document root (Hostinger / other hosts)
+ *   4. Default XAMPP config (root / no password)
  */
 
 error_reporting(E_ALL);
 
 /**
- * MySQL config for XAMPP.
+ * Parse a .env file into an associative array (does NOT call putenv).
+ */
+function parseEnvFile(string $path): array
+{
+    if (!is_file($path)) {
+        return [];
+    }
+    $vars = [];
+    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') {
+            continue;
+        }
+        if (strpos($line, '=') === false) {
+            continue;
+        }
+        [$key, $value] = explode('=', $line, 2);
+        $key   = trim($key);
+        $value = trim($value);
+        // Strip surrounding quotes
+        if (preg_match('/^(["\'])(.*)\\1$/', $value, $m)) {
+            $value = $m[2];
+        }
+        // Strip inline comments (e.g., "value #comment")
+        if (($pos = strpos($value, ' #')) !== false) {
+            $value = rtrim(substr($value, 0, $pos));
+        }
+        $vars[$key] = $value;
+    }
+    return $vars;
+}
+
+/**
+ * MySQL config — tries local file, env vars, .env file, then defaults.
  */
 function getDbConfig(): array
 {
+    // 1. Local config file (highest priority)
     $localFile = __DIR__ . '/db-config.local.php';
     if (is_file($localFile)) {
         $cfg = require $localFile;
@@ -19,7 +59,34 @@ function getDbConfig(): array
         }
     }
 
-    // Default XAMPP config
+    // 2. Real environment variables
+    $envHost = getenv('DB_HOST');
+    if ($envHost !== false && $envHost !== '') {
+        return [
+            'host'     => $envHost,
+            'port'     => (int)(getenv('DB_PORT') ?: 3306),
+            'dbname'   => getenv('DB_NAME') ?: 'lan_learn_auth',
+            'username' => getenv('DB_USER') ?: 'root',
+            'password' => getenv('DB_PASSWORD') ?: '',
+            'charset'  => 'utf8mb4',
+        ];
+    }
+
+    // 3. .env file in document root (Hostinger, etc.)
+    $envFile = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/.env';
+    $env = parseEnvFile($envFile);
+    if (!empty($env['DB_HOST'])) {
+        return [
+            'host'     => $env['DB_HOST'],
+            'port'     => (int)($env['DB_PORT'] ?? 3306),
+            'dbname'   => $env['DB_NAME'] ?? 'lan_learn_auth',
+            'username' => $env['DB_USER'] ?? 'root',
+            'password' => $env['DB_PASSWORD'] ?? '',
+            'charset'  => 'utf8mb4',
+        ];
+    }
+
+    // 4. Default XAMPP config (localhost development)
     return [
         'host'     => '127.0.0.1',
         'port'     => 3306,
