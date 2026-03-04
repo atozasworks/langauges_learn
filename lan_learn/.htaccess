@@ -1,0 +1,80 @@
+# ============================================================
+# CACHE CONTROL - Prevent stale content after deployments
+# ============================================================
+
+# Enable rewrite engine
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+</IfModule>
+
+# ------------------------------------------------------------
+# 1. DISABLE CACHING FOR HTML & PHP (always fetch fresh)
+# ------------------------------------------------------------
+<IfModule mod_headers.c>
+    # HTML files - never cache
+    <FilesMatch "\.(html|htm)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+
+    # PHP files - never cache
+    <FilesMatch "\.php$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+
+    # Service Worker - never cache (critical for updates)
+    <FilesMatch "sw\.js$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+
+    # Manifest - never cache
+    <FilesMatch "manifest\.json$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
+# ------------------------------------------------------------
+# 2. SHORT CACHE FOR CSS & JS (cache-busting via ?v= handles updates)
+#    Browsers re-validate after 1 hour; versioned URLs force fresh fetch
+# ------------------------------------------------------------
+<IfModule mod_headers.c>
+    <FilesMatch "\.(css|js)$">
+        Header set Cache-Control "public, max-age=3600, must-revalidate"
+    </FilesMatch>
+</IfModule>
+
+# ------------------------------------------------------------
+# 3. MODERATE CACHE FOR IMAGES & FONTS (rarely change)
+# ------------------------------------------------------------
+<IfModule mod_headers.c>
+    <FilesMatch "\.(ico|png|jpg|jpeg|gif|svg|webp|woff|woff2|ttf|eot)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+</IfModule>
+
+# ------------------------------------------------------------
+# 4. ENABLE GZIP COMPRESSION (faster loads)
+# ------------------------------------------------------------
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# ------------------------------------------------------------
+# 5. ENABLE ETags (efficient conditional requests)
+# ------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header unset ETag
+</IfModule>
+FileETag MTime Size

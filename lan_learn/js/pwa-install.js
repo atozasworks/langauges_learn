@@ -286,18 +286,37 @@ if (document.readyState === 'loading') {
 // Register service worker
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        // Try both relative paths for flexibility
         const swPath = './sw.js';
-        navigator.serviceWorker.register(swPath)
+        navigator.serviceWorker.register(swPath, { updateViaCache: 'none' })
             .then((registration) => {
                 console.log('ServiceWorker registration successful:', registration.scope);
-                // Check for updates
+
+                // Check for updates immediately
                 registration.update();
+
+                // Periodically check for SW updates (every 60 seconds)
+                setInterval(() => {
+                    registration.update();
+                }, 60 * 1000);
+
+                // Listen for a new SW waiting to activate
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    if (newWorker) {
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'activated') {
+                                // New SW activated — reload to get fresh content
+                                console.log('[PWA] New version activated — reloading...');
+                                window.location.reload();
+                            }
+                        });
+                    }
+                });
             })
             .catch((error) => {
                 console.log('ServiceWorker registration failed:', error);
                 // Try absolute path as fallback
-                navigator.serviceWorker.register('/sw.js')
+                navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
                     .then((registration) => {
                         console.log('ServiceWorker registration successful (absolute path):', registration.scope);
                     })
@@ -305,6 +324,16 @@ if ('serviceWorker' in navigator) {
                         console.log('ServiceWorker registration failed (both paths):', err);
                     });
             });
+    });
+
+    // When a new SW takes over via clients.claim(), reload for fresh content
+    let isFirstLoad = true;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!isFirstLoad) {
+            console.log('[PWA] Controller changed — reloading for fresh content...');
+            window.location.reload();
+        }
+        isFirstLoad = false;
     });
 }
 

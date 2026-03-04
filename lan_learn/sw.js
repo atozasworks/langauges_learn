@@ -1,81 +1,107 @@
 // Service Worker for GTongue Learn PWA
-const CACHE_NAME = 'gtongue-learn-v1';
+// =====================================================================
+// IMPORTANT: Bump CACHE_VERSION every time you deploy new files.
+// This forces the SW to re-install, purge old caches, and fetch fresh.
+// =====================================================================
+const CACHE_VERSION = '2';  // <-- INCREMENT ON EVERY DEPLOYMENT
+const CACHE_NAME   = 'gtongue-learn-v' + CACHE_VERSION;
+
 const urlsToCache = [
   './',
   './index.html',
   './styles/style.css',
   './styles/learn-home.css',
   './styles/dialogue.css',
-  './js/app.js',
+  './styles/login-modal.css',
+  './js/App.js',
   './js/learn-home.js',
   './js/dialogue-data.js',
   './js/dialogue.js',
   './js/utils.js',
   './js/translation-service.js',
   './js/pwa-install.js',
+  './js/login-modal.js',
   './manifest.json'
 ];
 
-// Install event - cache resources
+// Install event - cache resources and activate immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
+        console.log('[SW] Caching app shell, version', CACHE_VERSION);
         return cache.addAll(urlsToCache);
       })
       .catch((error) => {
-        console.error('Cache failed:', error);
+        console.error('[SW] Cache failed:', error);
       })
   );
+  // Activate new SW immediately without waiting for old tabs to close
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up ALL old caches, then claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
+        cacheNames.map((name) => {
+          if (name !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', name);
+            return caches.delete(name);
           }
         })
       );
+    }).then(() => {
+      console.log('[SW] Activated — version', CACHE_VERSION);
+      // Take control of all open tabs immediately
+      return self.clients.claim();
     })
   );
-  return self.clients.claim();
 });
 
-// Fetch event - serve from cache, fallback to network
+// =====================================================================
+// Fetch Strategy: NETWORK-FIRST with cache fallback
+//   - Always tries the network first so users get fresh content.
+//   - Falls back to cache only when offline.
+//   - Caches successful GET responses for offline use.
+// =====================================================================
 self.addEventListener('fetch', (event) => {
+  const request = event.request;
+
+  // Skip non-GET requests (POST, PUT, etc.)
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  // Skip cross-origin requests (CDNs, Google APIs, etc.)
+  if (!request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version or fetch from network
-        return response || fetch(event.request).then((response) => {
-          // Don't cache non-GET requests or non-successful responses
-          if (event.request.method !== 'GET' || !response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          // Clone the response
-          const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-
-          return response;
-        });
-      })
-        .catch(() => {
-        // If both cache and network fail, return offline page if available
-        if (event.request.destination === 'document') {
-          return caches.match('./index.html');
+    fetch(request)
+      .then((networkResponse) => {
+        // Got a fresh response from the network
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache);
+          });
         }
+        return networkResponse;
+      })
+      .catch(() => {
+        // Network failed — serve from cache (offline mode)
+        return caches.match(request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // If it's a page navigation, serve the cached index.html
+          if (request.destination === 'document') {
+            return caches.match('./index.html');
+          }
+        });
       })
   );
 });
