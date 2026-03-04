@@ -3,6 +3,17 @@
 js/default-learners.json
 **/default-learners.json
 
+# ── Secrets / Environment ──
+.env
+.env.local
+.env.*.local
+
+# ── Local config files with secrets ──
+auth-backend/*-config.local.php
+auth-backend/google-config.local.php
+auth-backend/smtp-config.local.php
+auth-backend/db-config.local.php
+
 # Node modules (if any)
 node_modules/
 

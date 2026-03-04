@@ -28,7 +28,7 @@
 
   const googleClientId =
     googleOption.getAttribute("data-client-id") ||
-    "517209799545-dtdrnpunls3uvte15oirf9rg5qrnlo1n.apps.googleusercontent.com";
+    "444024521791-26vj3nj553l540pjhofsgnk9tv2du5gh.apps.googleusercontent.com";
 
   // ─── Check if user is already logged in (sessionStorage) ───
   const savedUser = sessionStorage.getItem("loggedInUser");
