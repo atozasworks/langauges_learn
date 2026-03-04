@@ -4,32 +4,49 @@ class GroqDialogueService {
         this.model = 'llama-3.3-70b-versatile';
         this.storageKey = 'groq_api_key';
         this.lastLocationKey = 'dialogue_last_location';
+        this._cachedApiKey = null;
     }
 
     getApiKey() {
-        return (localStorage.getItem(this.storageKey) || '').trim();
+        return this._cachedApiKey || localStorage.getItem(this.storageKey) || '';
     }
 
     setApiKey(apiKey) {
-        localStorage.setItem(this.storageKey, (apiKey || '').trim());
+        this._cachedApiKey = (apiKey || '').trim();
+        localStorage.setItem(this.storageKey, this._cachedApiKey);
     }
 
     clearApiKey() {
+        this._cachedApiKey = null;
         localStorage.removeItem(this.storageKey);
     }
 
     async ensureApiKey() {
-        let apiKey = this.getApiKey();
-        if (apiKey) return apiKey;
+        // Return cached key if available
+        if (this._cachedApiKey) return this._cachedApiKey;
 
-        const entered = window.prompt('Enter your Groq API key to generate dialogues on the spot:');
-        if (!entered || !entered.trim()) {
-            throw new Error('Groq API key is required to generate dynamic dialogues.');
+        // Try fetching from server-side .env via PHP endpoint
+        try {
+            const resp = await fetch('/auth-backend/get-groq-key.php');
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.key) {
+                    this._cachedApiKey = data.key;
+                    return this._cachedApiKey;
+                }
+            }
+        } catch (e) {
+            console.warn('Could not fetch Groq API key from server:', e.message);
         }
 
-        apiKey = entered.trim();
-        this.setApiKey(apiKey);
-        return apiKey;
+        // Fallback: check localStorage
+        const stored = (localStorage.getItem(this.storageKey) || '').trim();
+        if (stored) {
+            this._cachedApiKey = stored;
+            return stored;
+        }
+
+        throw new Error('Groq API key is not configured. Please set GROQ_API_KEY in the .env file.');
     }
 
     async getLocationContext(preferences = {}) {
