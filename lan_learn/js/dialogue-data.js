@@ -20,14 +20,12 @@ Person 3: Hello! I'm fine too.
 Person 4: Hi! All good here. Long time no see!
 
 
-
 Conversation 3 
 Basic Introduction and Greetings
 Person 1: Hello! Where are you from?
 Person 2: I'm from Chennai. You?
 Person 3: Bangalore here.
 Person 4: I'm from Hyderabad. Nice to meet you all!
-
 
 
 Conversation 4  

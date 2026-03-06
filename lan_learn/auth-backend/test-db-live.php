@@ -18,7 +18,7 @@ echo "  password: " . (isset($cfg['password']) ? str_repeat('*', strlen($cfg['pa
 // Test 1: Connect with localhost (Unix socket)
 echo "--- Test 1: localhost (Unix socket) ---\n";
 try {
-    $dsn = "mysql:host=localhost;port=3306;charset=utf8mb4";
+    $dsn = "mysql:host=localhost;port=3307;charset=utf8mb4";
     $pdo = new PDO($dsn, $cfg['username'], $cfg['password'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_TIMEOUT => 5,
@@ -32,7 +32,7 @@ try {
 // Test 2: Connect with 127.0.0.1 (TCP)
 echo "\n--- Test 2: 127.0.0.1 (TCP) ---\n";
 try {
-    $dsn = "mysql:host=127.0.0.1;port=3306;charset=utf8mb4";
+    $dsn = "mysql:host=127.0.0.1;port=3307;charset=utf8mb4";
     $pdo = new PDO($dsn, $cfg['username'], $cfg['password'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_TIMEOUT => 5,

@@ -22,7 +22,7 @@ function getDbConfig(): array
     // Default XAMPP config
     return [
         'host'     => '127.0.0.1',
-        'port'     => 3306,
+        'port'     => 3307,
         'dbname'   => 'lan_learn_auth',
         'username' => 'root',
         'password' => '',
@@ -42,7 +42,7 @@ function getLoginDbConnection(): PDO
 
     $c = getDbConfig();
     $host    = $c['host']     ?? '127.0.0.1';
-    $port    = (int)($c['port'] ?? 3306);
+    $port    = (int)($c['port'] ?? 3307);
     $dbname  = $c['dbname']   ?? 'lan_learn_auth';
     $user    = $c['username'] ?? 'root';
     $pass    = $c['password'] ?? '';

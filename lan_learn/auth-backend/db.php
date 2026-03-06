@@ -64,7 +64,7 @@ function getDbConfig(): array
     if ($envHost !== false && $envHost !== '') {
         return [
             'host'     => $envHost,
-            'port'     => (int)(getenv('DB_PORT') ?: 3306),
+            'port'     => (int)(getenv('DB_PORT') ?: 3307),
             'dbname'   => getenv('DB_NAME') ?: 'lan_learn_auth',
             'username' => getenv('DB_USER') ?: 'root',
             'password' => getenv('DB_PASSWORD') ?: '',
@@ -78,7 +78,7 @@ function getDbConfig(): array
     if (!empty($env['DB_HOST'])) {
         return [
             'host'     => $env['DB_HOST'],
-            'port'     => (int)($env['DB_PORT'] ?? 3306),
+            'port'     => (int)($env['DB_PORT'] ?? 3307),
             'dbname'   => $env['DB_NAME'] ?? 'lan_learn_auth',
             'username' => $env['DB_USER'] ?? 'root',
             'password' => $env['DB_PASSWORD'] ?? '',
@@ -89,7 +89,7 @@ function getDbConfig(): array
     // 4. Default XAMPP config (localhost development)
     return [
         'host'     => '127.0.0.1',
-        'port'     => 3306,
+        'port'     => 3307,
         'dbname'   => 'lan_learn_auth',
         'username' => 'root',
         'password' => '',
@@ -109,7 +109,7 @@ function getLoginDbConnection(): PDO
 
     $c = getDbConfig();
     $host    = $c['host']     ?? '127.0.0.1';
-    $port    = (int)($c['port'] ?? 3306);
+    $port    = (int)($c['port'] ?? 3307);
     $dbname  = $c['dbname']   ?? 'lan_learn_auth';
     $user    = $c['username'] ?? 'root';
     $pass    = $c['password'] ?? '';

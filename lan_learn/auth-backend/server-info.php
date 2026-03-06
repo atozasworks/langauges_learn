@@ -39,7 +39,7 @@ $info['mysql_tests'] = [];
 $hosts = ['localhost', '127.0.0.1'];
 foreach ($hosts as $host) {
     try {
-        $testPdo = new PDO("mysql:host={$host};port=3306;charset=utf8mb4", 'root', '', [
+        $testPdo = new PDO("mysql:host={$host};port=3307;charset=utf8mb4", 'root', '', [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_TIMEOUT => 3,
         ]);

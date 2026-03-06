@@ -32,7 +32,7 @@ echo '<p style="color:green;">✅ pdo_mysql extension is loaded.</p>';
 // ── Step 2: Test MySQL connection ──
 echo '<h2>Step 2: Connect to MySQL</h2>';
 try {
-    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;charset=utf8mb4', 'root', '', [
+    $pdo = new PDO('mysql:host=127.0.0.1;port=3307;charset=utf8mb4', 'root', '', [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     ]);
     echo '<p style="color:green;">✅ Connected to MySQL server.</p>';
