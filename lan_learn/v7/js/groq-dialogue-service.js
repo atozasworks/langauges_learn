@@ -1,8 +1,8 @@
 class GroqDialogueService {
     constructor() {
-        this.apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-        this.model = 'llama-3.3-70b-versatile';
-        this.storageKey = 'groq_api_key';
+        this.apiUrl = 'https://api.deepseek.com/chat/completions';
+        this.model = 'deepseek-chat';
+        this.storageKey = 'deepseek_api_key';
         this.lastLocationKey = 'dialogue_last_location';
     }
 
@@ -22,9 +22,9 @@ class GroqDialogueService {
         let apiKey = this.getApiKey();
         if (apiKey) return apiKey;
 
-        const entered = window.prompt('Enter your Groq API key to generate dialogues on the spot:');
+        const entered = window.prompt('Enter your DeepSeek API key to generate dialogues on the spot:');
         if (!entered || !entered.trim()) {
-            throw new Error('Groq API key is required to generate dynamic dialogues.');
+            throw new Error('DeepSeek API key is required to generate dynamic dialogues.');
         }
 
         apiKey = entered.trim();
@@ -33,6 +33,15 @@ class GroqDialogueService {
     }
 
     async getLocationContext(preferences = {}) {
+        const providedLocation = String(preferences.geographicLocation || preferences.manualLocation || '').trim();
+        if (providedLocation) {
+            localStorage.setItem(this.lastLocationKey, providedLocation);
+            return {
+                source: 'manual-entry',
+                locationLabel: providedLocation
+            };
+        }
+
         const mode = preferences.locationMode || 'auto';
 
         if (mode === 'manual') {
@@ -132,8 +141,12 @@ class GroqDialogueService {
         level,
         languageName,
         languageCode,
-        locationLabel
+        locationLabel,
+        category
     }) {
+        const normalizedCategory = this.normalizeCategory(category);
+        const categoryBehavior = this.getCategoryBehavior(normalizedCategory);
+
         const buildPayload = (strictMode = false) => {
             const systemPrompt = [
             'You are an expert language-learning dialogue writer.',
@@ -141,21 +154,22 @@ class GroqDialogueService {
             'Output schema: {"conversations":[{"title":"...","lines":["...16 lines..."]}]}',
             'Rules:',
             '- Exactly 25 conversations.',
-            '- Category for ALL conversations: comedy dialogues.',
+            `- Conversation variant for ALL conversations: ${normalizedCategory}.`,
             '- Each conversation must contain exactly 16 short, natural sentences.',
             '- Sentences must represent a realistic real-life situation in the provided geographic location.',
-            '- Tone must be clearly funny, playful, and suitable for language learners.',
-            '- Every conversation must include at least one comic misunderstanding, one playful exaggeration, and one light punchline.',
-            '- Avoid neutral or serious tone.',
+            `- Tone must strongly match the selected conversation variant: ${normalizedCategory}.`,
+            ...categoryBehavior.systemRules,
             '- Keep content safe, practical, and culturally appropriate.',
             '- Language of all titles and lines must be the requested target language.',
-            '- Do not add speaker labels in the lines.'
+            '- Do not add speaker labels in the lines.',
+            '- Keep sentences simple and useful for language learners.',
+            '- End each conversation with a natural or engaging final line.'
             ];
 
             if (strictMode) {
                 systemPrompt.push(
-                    '- STRICT MODE: Reject serious, formal, or neutral content.',
-                    '- STRICT MODE: If any conversation sounds serious, rewrite it with humor before final output.'
+                    '- STRICT MODE: Reject off-category tone or mixed-category output.',
+                    '- STRICT MODE: Ensure all 25 conversations strongly match the selected conversation variant before final output.'
                 );
             }
 
@@ -164,13 +178,14 @@ class GroqDialogueService {
                 `Target language code: ${languageCode}`,
                 `Learning level: ${level}`,
                 `Geographic location focus: ${locationLabel}`,
-                'Conversation category: Comedy dialogues.',
-                'Create conversations that help learners speak in everyday local scenarios (transport, market, clinic, office, school, food, travel, emergencies, neighborhood, social situations, services), and keep every conversation comedic.',
+                `Conversation variant: ${normalizedCategory}.`,
+                'Create conversations that help learners speak in everyday local scenarios (transport, market, clinic, office, school, food, travel, emergencies, neighborhood, social situations, services).',
+                ...categoryBehavior.userRules,
                 'Each line must be one sentence and easy to read for the selected level.'
             ];
 
             if (strictMode) {
-                userPrompt.push('Do not produce serious conversations. Keep humor obvious throughout all 25 conversations.');
+                userPrompt.push('Do not produce mixed tones. Keep all 25 conversations fully aligned with the selected conversation variant.');
             }
 
             return {
@@ -191,54 +206,55 @@ class GroqDialogueService {
             activeApiKey = await this.ensureApiKey();
         }
 
-        let data = await this.requestGroqCompletion(activeApiKey, payload);
+        let data = await this.requestDeepSeekCompletion(activeApiKey, payload);
 
         // Retry once if API key is invalid
         if (data?.__invalidApiKey) {
             this.clearApiKey();
-            await this.showMessagePopup('Stored Groq API key is invalid. Please enter a valid key.');
+            await this.showMessagePopup('Stored DeepSeek API key is invalid. Please enter a valid key.');
             const refreshedApiKey = await this.ensureApiKey();
-            data = await this.requestGroqCompletion(refreshedApiKey, payload);
+            data = await this.requestDeepSeekCompletion(refreshedApiKey, payload);
             if (data?.__invalidApiKey) {
                 this.clearApiKey();
-                throw new Error('Groq API key is invalid. Please update your API key and try again.');
+                throw new Error('DeepSeek API key is invalid. Please update your API key and try again.');
             }
         }
 
         const content = data?.choices?.[0]?.message?.content;
 
         if (!content) {
-            throw new Error('Groq response did not include generated content.');
+            throw new Error('DeepSeek response did not include generated content.');
         }
 
         const parsed = this.parseGeneratedContent(content);
-        let normalized = this.normalizeConversations(parsed?.conversations || []);
+        let normalized = this.normalizeConversations(parsed?.conversations || [], normalizedCategory);
 
         const context = {
             languageName,
             languageCode,
             level,
-            locationLabel
+            locationLabel,
+            category: normalizedCategory
         };
 
-        let humorCheck = await this.validateComedyQuality(activeApiKey, normalized, context);
+        let categoryCheck = await this.validateCategoryQuality(activeApiKey, normalized, context);
 
-        if (!humorCheck.isAllFunny) {
-            normalized = await this.rewriteNonFunnyConversations(activeApiKey, normalized, humorCheck.notFunnyIndexes, context);
-            humorCheck = await this.validateComedyQuality(activeApiKey, normalized, context);
+        if (!categoryCheck.isAllOnCategory) {
+            normalized = await this.rewriteOffCategoryConversations(activeApiKey, normalized, categoryCheck.offCategoryIndexes, context);
+            categoryCheck = await this.validateCategoryQuality(activeApiKey, normalized, context);
         }
 
-        if (!humorCheck.isAllFunny) {
+        if (!categoryCheck.isAllOnCategory) {
             const strictPayload = buildPayload(true);
-            const strictData = await this.requestGroqCompletion(activeApiKey, strictPayload);
+            const strictData = await this.requestDeepSeekCompletion(activeApiKey, strictPayload);
             const strictContent = strictData?.choices?.[0]?.message?.content;
             if (strictContent) {
                 const strictParsed = this.parseGeneratedContent(strictContent);
-                normalized = this.normalizeConversations(strictParsed?.conversations || []);
+                normalized = this.normalizeConversations(strictParsed?.conversations || [], normalizedCategory);
 
-                const strictCheck = await this.validateComedyQuality(activeApiKey, normalized, context);
-                if (!strictCheck.isAllFunny) {
-                    normalized = await this.rewriteNonFunnyConversations(activeApiKey, normalized, strictCheck.notFunnyIndexes, context);
+                const strictCheck = await this.validateCategoryQuality(activeApiKey, normalized, context);
+                if (!strictCheck.isAllOnCategory) {
+                    normalized = await this.rewriteOffCategoryConversations(activeApiKey, normalized, strictCheck.offCategoryIndexes, context);
                 }
             }
         }
@@ -246,7 +262,75 @@ class GroqDialogueService {
         return normalized;
     }
 
-    async validateComedyQuality(apiKey, conversations, context) {
+    normalizeCategory(category) {
+        const normalized = String(category || '').trim().replace(/\s+/g, ' ');
+        return normalized ? normalized.slice(0, 80) : 'funny dialogues';
+    }
+
+    getCategoryBehavior(category) {
+        const normalized = this.normalizeCategory(category).toLowerCase();
+
+        if (normalized === 'funny dialogues') {
+            return {
+                systemRules: [
+                    '- Conversations must be humorous, playful, and include light jokes or misunderstandings.',
+                    '- Avoid serious or formal tone.'
+                ],
+                userRules: [
+                    'Include playful misunderstandings and light punchlines in each conversation.'
+                ],
+                validatorRule: 'Mark as off-category if a conversation is not clearly humorous or playful.',
+                rewriteRule: 'Rewrites must be clearly funny and playful with light jokes.',
+                fallbackLine: 'That joke was silly, but now we understand each other better.'
+            };
+        }
+
+        if (normalized === 'angry dialogues') {
+            return {
+                systemRules: [
+                    '- Conversations must show realistic frustration, arguments, or irritation without unsafe content.',
+                    '- Keep conflict verbal and suitable for language learners.'
+                ],
+                userRules: [
+                    'Show tense real-life disagreements while keeping language simple and safe.'
+                ],
+                validatorRule: 'Mark as off-category if frustration, argument, or irritation is not clearly present.',
+                rewriteRule: 'Rewrites must clearly show realistic irritation or arguments while remaining safe.',
+                fallbackLine: 'I am still upset, but we can solve this calmly now.'
+            };
+        }
+
+        if (normalized === 'romantic dialogues') {
+            return {
+                systemRules: [
+                    '- Conversations must feel warm, emotional, and affectionate.',
+                    '- Keep tone respectful, gentle, and suitable for learners.'
+                ],
+                userRules: [
+                    'Use affectionate and caring language in realistic daily situations.'
+                ],
+                validatorRule: 'Mark as off-category if warmth and affection are not clearly present.',
+                rewriteRule: 'Rewrites must be emotionally warm and affectionate in a respectful way.',
+                fallbackLine: 'I feel close to you, and this moment means a lot.'
+            };
+        }
+
+        return {
+            systemRules: [
+                `- Conversations must strongly match this selected category: ${this.normalizeCategory(category)}.`
+            ],
+            userRules: [
+                `Keep tone and word choice strongly aligned with: ${this.normalizeCategory(category)}.`
+            ],
+            validatorRule: `Mark as off-category if tone does not strongly match: ${this.normalizeCategory(category)}.`,
+            rewriteRule: `Rewrites must strongly match this category: ${this.normalizeCategory(category)}.`,
+            fallbackLine: 'That situation felt real, and now we know what to say next.'
+        };
+    }
+
+    async validateCategoryQuality(apiKey, conversations, context) {
+        const categoryBehavior = this.getCategoryBehavior(context.category);
+
         try {
             const validatorPayload = {
                 model: this.model,
@@ -256,11 +340,12 @@ class GroqDialogueService {
                     {
                         role: 'system',
                         content: [
-                            'You are a strict comedy validator for language-learning dialogues.',
+                            'You are a strict category validator for language-learning dialogues.',
                             'Return ONLY valid JSON with this schema:',
-                            '{"isAllFunny":true|false,"notFunnyIndexes":[0-based indexes]}.',
-                            'Mark a conversation as not funny if it is serious, formal, neutral, or lacks obvious humor.',
-                            'isAllFunny must be true only when all 25 conversations are clearly funny.'
+                            '{"isAllOnCategory":true|false,"offCategoryIndexes":[0-based indexes]}.',
+                            categoryBehavior.validatorRule,
+                            'isAllOnCategory must be true only when all 25 conversations strongly match the selected conversation variant.',
+                            'Also ensure each conversation has 16 short natural lines and no speaker labels.'
                         ].join('\n')
                     },
                     {
@@ -269,45 +354,47 @@ class GroqDialogueService {
                             `Language: ${context.languageName} (${context.languageCode})`,
                             `Level: ${context.level}`,
                             `Location focus: ${context.locationLabel}`,
-                            'Check whether these 25 conversations are clearly comedic overall:',
+                            `Conversation variant: ${context.category}`,
+                            'Check whether these 25 conversations strongly match the selected conversation variant overall:',
                             JSON.stringify({ conversations })
                         ].join('\n')
                     }
                 ]
             };
 
-            const validation = await this.requestGroqCompletion(apiKey, validatorPayload);
+            const validation = await this.requestDeepSeekCompletion(apiKey, validatorPayload);
             const content = validation?.choices?.[0]?.message?.content;
             if (!content) {
-                return { isAllFunny: false, notFunnyIndexes: conversations.map((_, index) => index) };
+                return { isAllOnCategory: false, offCategoryIndexes: conversations.map((_, index) => index) };
             }
 
             const parsed = this.parseGeneratedContent(content);
-            const notFunnyIndexes = Array.isArray(parsed?.notFunnyIndexes)
-                ? parsed.notFunnyIndexes
+            const offCategoryIndexes = Array.isArray(parsed?.offCategoryIndexes)
+                ? parsed.offCategoryIndexes
                     .map(index => Number(index))
                     .filter(index => Number.isInteger(index) && index >= 0 && index < conversations.length)
                 : [];
 
-            const isAllFunny = Boolean(parsed?.isAllFunny) && notFunnyIndexes.length === 0;
+            const isAllOnCategory = Boolean(parsed?.isAllOnCategory) && offCategoryIndexes.length === 0;
             return {
-                isAllFunny,
-                notFunnyIndexes: isAllFunny ? [] : (notFunnyIndexes.length > 0 ? notFunnyIndexes : conversations.map((_, index) => index))
+                isAllOnCategory,
+                offCategoryIndexes: isAllOnCategory ? [] : (offCategoryIndexes.length > 0 ? offCategoryIndexes : conversations.map((_, index) => index))
             };
         } catch (error) {
-            console.warn('Comedy validation failed, treating all conversations as needing rewrite.', error);
-            return { isAllFunny: false, notFunnyIndexes: conversations.map((_, index) => index) };
+            console.warn('Category validation failed, treating all conversations as needing rewrite.', error);
+            return { isAllOnCategory: false, offCategoryIndexes: conversations.map((_, index) => index) };
         }
     }
 
-    async rewriteNonFunnyConversations(apiKey, conversations, notFunnyIndexes, context) {
-        const indexesToRewrite = Array.isArray(notFunnyIndexes) && notFunnyIndexes.length > 0
-            ? [...new Set(notFunnyIndexes)]
+    async rewriteOffCategoryConversations(apiKey, conversations, offCategoryIndexes, context) {
+        const categoryBehavior = this.getCategoryBehavior(context.category);
+        const indexesToRewrite = Array.isArray(offCategoryIndexes) && offCategoryIndexes.length > 0
+            ? [...new Set(offCategoryIndexes)]
             : conversations.map((_, index) => index);
 
         const selected = indexesToRewrite.map(index => ({
             index,
-            title: conversations[index]?.title || `Comedy Conversation ${index + 1}`,
+            title: conversations[index]?.title || `Conversation ${index + 1}`,
             lines: Array.isArray(conversations[index]?.lines) ? conversations[index].lines.slice(0, 16) : []
         }));
 
@@ -319,16 +406,17 @@ class GroqDialogueService {
                 {
                     role: 'system',
                     content: [
-                        'You rewrite dialogues to be clearly funny while preserving language-learning clarity.',
+                        'You rewrite dialogues so they strictly match a selected category while preserving language-learning clarity.',
                         'Return ONLY valid minified JSON: {"conversations":[{"index":0,"title":"...","lines":["16 lines"]}]}',
                         'Rules:',
                         '- Rewrite only the provided conversations.',
                         '- Keep the same index for each rewritten conversation.',
                         '- Each rewritten conversation must have exactly 16 short lines.',
-                        '- Humor must be obvious and light in every rewritten conversation.',
+                        categoryBehavior.rewriteRule,
                         '- Use everyday real-life situations only.',
                         '- Keep content safe and culturally appropriate.',
-                        '- Do not include speaker labels in lines.'
+                        '- Do not include speaker labels in lines.',
+                        '- End each conversation with a natural or engaging final line.'
                     ].join('\n')
                 },
                 {
@@ -337,7 +425,8 @@ class GroqDialogueService {
                         `Language: ${context.languageName} (${context.languageCode})`,
                         `Level: ${context.level}`,
                         `Location focus: ${context.locationLabel}`,
-                        'Rewrite these conversations to be clearly funny:',
+                        `Conversation variant: ${context.category}`,
+                        'Rewrite these conversations so they strongly match the selected conversation variant:',
                         JSON.stringify({ conversations: selected })
                     ].join('\n')
                 }
@@ -345,7 +434,7 @@ class GroqDialogueService {
         };
 
         try {
-            const rewriteResponse = await this.requestGroqCompletion(apiKey, rewritePayload);
+            const rewriteResponse = await this.requestDeepSeekCompletion(apiKey, rewritePayload);
             const content = rewriteResponse?.choices?.[0]?.message?.content;
             if (!content) {
                 return conversations;
@@ -359,7 +448,7 @@ class GroqDialogueService {
                 const index = Number(item?.index);
                 if (!Number.isInteger(index) || index < 0 || index >= updated.length) return;
 
-                const title = String(item?.title || updated[index].title || `Comedy Conversation ${index + 1}`).trim();
+                const title = String(item?.title || updated[index].title || `Conversation ${index + 1}`).trim();
                 const sourceLines = Array.isArray(item?.lines) ? item.lines : [];
                 const cleaned = sourceLines
                     .map(line => String(line || '').trim())
@@ -368,23 +457,23 @@ class GroqDialogueService {
 
                 const lines = cleaned.slice(0, 16);
                 while (lines.length < 16) {
-                    lines.push('That punchline slipped, so let us try this comedy line again.');
+                    lines.push(categoryBehavior.fallbackLine);
                 }
 
                 updated[index] = {
-                    title: title || `Comedy Conversation ${index + 1}`,
+                    title: title || `Conversation ${index + 1}`,
                     lines
                 };
             });
 
             return updated;
         } catch (error) {
-            console.warn('Failed to rewrite non-funny conversations.', error);
+            console.warn('Failed to rewrite off-category conversations.', error);
             return conversations;
         }
     }
 
-    async requestGroqCompletion(apiKey, payload) {
+    async requestDeepSeekCompletion(apiKey, payload) {
         const response = await fetch(this.apiUrl, {
             method: 'POST',
             headers: {
@@ -396,22 +485,40 @@ class GroqDialogueService {
 
         if (!response.ok) {
             const errText = await response.text();
+
+            // Some DeepSeek deployments may reject response_format; retry once without it.
+            if (response.status === 400 && payload?.response_format) {
+                const lowerErr = String(errText || '').toLowerCase();
+                const mentionsResponseFormat = lowerErr.includes('response_format') || lowerErr.includes('unsupported') || lowerErr.includes('invalid parameter');
+                if (mentionsResponseFormat) {
+                    const fallbackPayload = { ...payload };
+                    delete fallbackPayload.response_format;
+                    return this.requestDeepSeekCompletion(apiKey, fallbackPayload);
+                }
+            }
+
             if (this.isInvalidApiKeyError(response.status, errText)) {
                 return { __invalidApiKey: true };
             }
-            throw new Error(`Groq API request failed (${response.status}): ${errText}`);
+            throw new Error(`DeepSeek API request failed (${response.status}): ${errText}`);
         }
 
         return response.json();
     }
 
     isInvalidApiKeyError(status, errorText) {
-        if (status !== 401) {
+        if (status !== 401 && status !== 403) {
             return false;
         }
 
         const text = String(errorText || '').toLowerCase();
-        return text.includes('invalid_api_key') || text.includes('invalid api key');
+        return (
+            text.includes('invalid_api_key') ||
+            text.includes('invalid api key') ||
+            text.includes('invalid key') ||
+            text.includes('authentication') ||
+            text.includes('unauthorized')
+        );
     }
 
     showLocationModePopup() {
@@ -492,10 +599,12 @@ class GroqDialogueService {
         }
     }
 
-    normalizeConversations(conversations) {
+    normalizeConversations(conversations, category = 'funny dialogues') {
         if (!Array.isArray(conversations) || conversations.length === 0) {
             throw new Error('No conversations were returned by Groq.');
         }
+
+        const categoryBehavior = this.getCategoryBehavior(category);
 
         const normalized = conversations.slice(0, 25).map((conversation, index) => {
             const rawTitle = (conversation?.title || `Real-Life Situation ${index + 1}`).toString().trim();
@@ -508,7 +617,7 @@ class GroqDialogueService {
 
             const lines = cleaned.slice(0, 16);
             while (lines.length < 16) {
-                lines.push('That was too serious, so let us continue this comedy conversation with a smile.');
+                lines.push(categoryBehavior.fallbackLine);
             }
 
             return { title, lines };
@@ -518,7 +627,7 @@ class GroqDialogueService {
             const i = normalized.length + 1;
             normalized.push({
                 title: `Real-Life Situation ${i}`,
-                lines: Array.from({ length: 16 }, () => 'That was too serious, so let us continue this comedy conversation with a smile.')
+                lines: Array.from({ length: 16 }, () => categoryBehavior.fallbackLine)
             });
         }
 

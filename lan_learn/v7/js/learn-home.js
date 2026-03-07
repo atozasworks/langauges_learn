@@ -11,6 +11,8 @@ class LearnHome {
         await this.loadLearners();
         this.setupEventListeners();
         this.initializeLearningLevelSelector();
+        this.initializeConversationVariantInput();
+        this.initializeGeographicLocationInput();
         this.initializeDataTable();
         this.updateCounts();
         // Update select-all checkbox after initialization
@@ -219,19 +221,50 @@ class LearnHome {
 
     collectGenerationPreferences() {
         const levelSelector = document.getElementById('learning-level-select');
+        const variantInput = document.getElementById('conversation-variant-input');
+        const locationInput = document.getElementById('geographic-location-input');
         const selectedValue = (levelSelector?.value || '').trim().toLowerCase();
+        const rawVariant = (variantInput?.value || '').trim();
+        const rawLocation = (locationInput?.value || '').trim();
         const normalizedLevel = selectedValue;
+        const normalizedVariant = this.normalizeConversationVariant(rawVariant);
+        const normalizedLocation = this.normalizeGeographicLocation(rawLocation);
 
         if (!['beginner', 'medium', 'advanced'].includes(normalizedLevel)) {
             Utils.showToast('Invalid level. Use beginner, medium, or advanced.', 'warning');
             return null;
         }
 
+        if (!normalizedVariant) {
+            Utils.showToast('Please enter a conversation variant.', 'warning');
+            return null;
+        }
+
+        if (!normalizedLocation) {
+            Utils.showToast('Please enter a geographic location.', 'warning');
+            return null;
+        }
+
         Utils.saveToStorage('dialogueLearningLevel', normalizedLevel);
+        Utils.saveToStorage('conversationVariant', normalizedVariant);
+        Utils.saveToStorage('dialogueCategory', normalizedVariant);
+        Utils.saveToStorage('geographicLocation', normalizedLocation);
+
+        if (variantInput) {
+            variantInput.value = normalizedVariant;
+        }
+
+        if (locationInput) {
+            locationInput.value = normalizedLocation;
+        }
 
         return {
             level: normalizedLevel,
-            locationMode: 'auto'
+            category: normalizedVariant,
+            conversationVariant: normalizedVariant,
+            geographicLocation: normalizedLocation,
+            locationMode: 'manual',
+            manualLocation: normalizedLocation
         };
     }
 
@@ -250,6 +283,51 @@ class LearnHome {
                 Utils.saveToStorage('dialogueLearningLevel', value);
             }
         });
+    }
+
+    initializeConversationVariantInput() {
+        const variantInput = document.getElementById('conversation-variant-input');
+        if (!variantInput) return;
+
+        const savedVariant = Utils.getFromStorage(
+            'conversationVariant',
+            Utils.getFromStorage('dialogueCategory', 'funny dialogues')
+        );
+        const normalized = this.normalizeConversationVariant(savedVariant) || 'funny dialogues';
+        variantInput.value = normalized;
+
+        variantInput.addEventListener('blur', () => {
+            const value = this.normalizeConversationVariant(variantInput.value);
+            if (!value) return;
+            variantInput.value = value;
+            Utils.saveToStorage('conversationVariant', value);
+            Utils.saveToStorage('dialogueCategory', value);
+        });
+    }
+
+    initializeGeographicLocationInput() {
+        const locationInput = document.getElementById('geographic-location-input');
+        if (!locationInput) return;
+
+        const savedLocation = Utils.getFromStorage('geographicLocation', '');
+        locationInput.value = this.normalizeGeographicLocation(savedLocation);
+
+        locationInput.addEventListener('blur', () => {
+            const value = this.normalizeGeographicLocation(locationInput.value);
+            locationInput.value = value;
+            if (!value) return;
+            Utils.saveToStorage('geographicLocation', value);
+        });
+    }
+
+    normalizeConversationVariant(value) {
+        const normalized = String(value || '').trim().replace(/\s+/g, ' ');
+        return normalized.slice(0, 80);
+    }
+
+    normalizeGeographicLocation(value) {
+        const normalized = String(value || '').trim().replace(/\s+/g, ' ');
+        return normalized.slice(0, 120);
     }
 
     getSelectedLearnerNames() {

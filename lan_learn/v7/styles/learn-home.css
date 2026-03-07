@@ -66,7 +66,21 @@
     gap: 0.5rem;
 }
 
+.conversation-variant-control,
+.geographic-location-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .learning-level-control label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.conversation-variant-control label,
+.geographic-location-control label {
     font-size: 0.95rem;
     font-weight: 600;
     color: #1f2937;
@@ -80,7 +94,24 @@
     background-color: #fff;
 }
 
+.conversation-variant-input,
+.geographic-location-input {
+    border: 2px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.95rem;
+    background-color: #fff;
+    min-width: 240px;
+}
+
 .learning-level-select:focus {
+    outline: none;
+    border-color: #54889b;
+    box-shadow: 0 0 5px rgba(84, 136, 155, 0.5);
+}
+
+.conversation-variant-input:focus,
+.geographic-location-input:focus {
     outline: none;
     border-color: #54889b;
     box-shadow: 0 0 5px rgba(84, 136, 155, 0.5);
@@ -233,6 +264,18 @@ input[type="checkbox"] {
     .learning-level-control {
         width: 100%;
         justify-content: center;
+    }
+
+    .conversation-variant-control,
+    .geographic-location-control {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .conversation-variant-input,
+    .geographic-location-input {
+        width: 100%;
+        min-width: 0;
     }
 
     .attendance-summary {

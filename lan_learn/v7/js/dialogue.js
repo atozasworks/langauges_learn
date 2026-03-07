@@ -11,6 +11,9 @@ class DialoguePage {
         this.groqService = typeof GroqDialogueService !== 'undefined' ? new GroqDialogueService() : null;
         this.generationPreferences = {
             level: 'beginner',
+            category: 'funny dialogues',
+            conversationVariant: 'funny dialogues',
+            geographicLocation: '',
             locationMode: 'auto',
             manualLocation: ''
         };
@@ -272,7 +275,16 @@ class DialoguePage {
         }
 
         const apiKey = await this.groqService.ensureApiKey();
-        const locationContext = await this.groqService.getLocationContext(this.generationPreferences);
+        const requestedLocation = String(
+            this.generationPreferences.geographicLocation || this.generationPreferences.manualLocation || ''
+        ).trim();
+
+        const locationContext = await this.groqService.getLocationContext({
+            ...this.generationPreferences,
+            geographicLocation: requestedLocation,
+            manualLocation: requestedLocation,
+            locationMode: requestedLocation ? 'manual' : this.generationPreferences.locationMode
+        });
 
         const translationService = window.app?.translationService;
         const languageCode = translationService?.getCurrentLanguage?.() || 'en';
@@ -281,13 +293,17 @@ class DialoguePage {
 
         const level = (this.generationPreferences.level || 'beginner').toLowerCase();
         const normalizedLevel = ['beginner', 'medium', 'advanced'].includes(level) ? level : 'beginner';
+        const category = String(
+            this.generationPreferences.conversationVariant || this.generationPreferences.category || 'funny dialogues'
+        ).trim() || 'funny dialogues';
 
         const conversations = await this.groqService.generateDialogues({
             apiKey,
             level: normalizedLevel,
             languageName,
             languageCode,
-            locationLabel: locationContext.locationLabel
+            locationLabel: locationContext.locationLabel,
+            category
         });
 
         return this.groqService.toDialogueText(conversations);
