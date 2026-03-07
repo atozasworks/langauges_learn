@@ -76,15 +76,44 @@
         <div class="home-container">
           <h3 class="home-heading">Speak Freely, Connect Globally Welcome!</h3>
 
-          <div class="variant-buttons">
-            <button type="button" onclick="alert('Hello world!')">Click Me!</button>
-            <a href="v1/index.html" class="variant-btn" id="variant1-btn">variant1</a>
-            <a href="v2/index.html" class="variant-btn" id="variant2-btn">variant2</a>
-            <a href="v3/index.html" class="variant-btn" id="variant3-btn">variant3</a>
-            <a href="v4/index.html" class="variant-btn" id="variant4-btn">variant4</a>
-            <a href="v5/index.html" class="variant-btn" id="variant5-btn">variant5</a>
-            <a href="v6/index.html" class="variant-btn" id="variant6-btn">variant6</a>
-            <a href="v7/index.html" class="variant-btn" id="variant7-btn">variant7</a>
+          <div class="variant-dropdown-container">
+            <div class="variant-dropdown" id="variant-dropdown">
+              <button
+                type="button"
+                id="variant-dropdown-toggle"
+                class="variant-dropdown-toggle"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+              >
+                <span id="variant-dropdown-label">Select Variant</span>
+                <span class="variant-dropdown-arrow" aria-hidden="true">&#9662;</span>
+              </button>
+
+              <div id="variant-dropdown-menu" class="variant-dropdown-menu" hidden>
+                <div class="variant-dropdown-search-wrap">
+                  <input
+                    type="text"
+                    id="variant-search-input"
+                    class="variant-dropdown-search"
+                    placeholder="Search variant..."
+                    aria-label="Search variants"
+                  />
+                </div>
+
+                <ul id="variant-options" class="variant-options" role="listbox" aria-label="Variant options">
+                  <li><button type="button" class="variant-option" data-value="v1/index.html">Variant 1</button></li>
+                  <li><button type="button" class="variant-option" data-value="v2/index.html">Variant 2</button></li>
+                  <li><button type="button" class="variant-option" data-value="v3/index.html">Variant 3</button></li>
+                  <li><button type="button" class="variant-option" data-value="v4/index.html">Variant 4</button></li>
+                  <li><button type="button" class="variant-option" data-value="v5/index.html">Variant 5</button></li>
+                  <li><button type="button" class="variant-option" data-value="v6/index.html">Variant 6</button></li>
+                  <li><button type="button" class="variant-option" data-value="v7/index.html">Variant 7</button></li>
+                  <li><button type="button" class="variant-option" data-value="v8/index.html">Variant 8</button></li>
+                </ul>
+
+                <p id="variant-no-results" class="variant-no-results" hidden>No matching variants.</p>
+              </div>
+            </div>
           </div>
 
           <div class="topbar">
