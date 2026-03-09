@@ -1,9 +1,26 @@
 class GroqDialogueService {
     constructor() {
-        this.apiUrl = 'https://api.deepseek.com/chat/completions';
-        this.model = 'deepseek-chat';
-        this.storageKey = 'deepseek_api_key';
+        this.apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
+        this.model = 'llama-3.3-70b-versatile';
+        this.storageKey = 'groq_api_key';
+        this.legacyDeepSeekStorageKey = 'deepseek_api_key';
         this.lastLocationKey = 'dialogue_last_location';
+        this.migrateLegacyApiKey();
+    }
+
+    migrateLegacyApiKey() {
+        const existingGroqKey = (localStorage.getItem(this.storageKey) || '').trim();
+        if (existingGroqKey) {
+            return;
+        }
+
+        const legacyDeepSeekKey = (localStorage.getItem(this.legacyDeepSeekStorageKey) || '').trim();
+        if (!legacyDeepSeekKey) {
+            return;
+        }
+
+        localStorage.setItem(this.storageKey, legacyDeepSeekKey);
+        localStorage.removeItem(this.legacyDeepSeekStorageKey);
     }
 
     getApiKey() {
@@ -22,9 +39,9 @@ class GroqDialogueService {
         let apiKey = this.getApiKey();
         if (apiKey) return apiKey;
 
-        const entered = window.prompt('Enter your DeepSeek API key to generate dialogues on the spot:');
+        const entered = window.prompt('Enter your Groq API key to generate dialogues on the spot:');
         if (!entered || !entered.trim()) {
-            throw new Error('DeepSeek API key is required to generate dynamic dialogues.');
+            throw new Error('Groq API key is required to generate dynamic dialogues.');
         }
 
         apiKey = entered.trim();
@@ -206,24 +223,24 @@ class GroqDialogueService {
             activeApiKey = await this.ensureApiKey();
         }
 
-        let data = await this.requestDeepSeekCompletion(activeApiKey, payload);
+        let data = await this.requestGroqCompletion(activeApiKey, payload);
 
         // Retry once if API key is invalid
         if (data?.__invalidApiKey) {
             this.clearApiKey();
-            await this.showMessagePopup('Stored DeepSeek API key is invalid. Please enter a valid key.');
+            await this.showMessagePopup('Stored Groq API key is invalid. Please enter a valid key.');
             const refreshedApiKey = await this.ensureApiKey();
-            data = await this.requestDeepSeekCompletion(refreshedApiKey, payload);
+            data = await this.requestGroqCompletion(refreshedApiKey, payload);
             if (data?.__invalidApiKey) {
                 this.clearApiKey();
-                throw new Error('DeepSeek API key is invalid. Please update your API key and try again.');
+                throw new Error('Groq API key is invalid. Please update your API key and try again.');
             }
         }
 
         const content = data?.choices?.[0]?.message?.content;
 
         if (!content) {
-            throw new Error('DeepSeek response did not include generated content.');
+            throw new Error('Groq response did not include generated content.');
         }
 
         const parsed = this.parseGeneratedContent(content);
@@ -246,7 +263,7 @@ class GroqDialogueService {
 
         if (!categoryCheck.isAllOnCategory) {
             const strictPayload = buildPayload(true);
-            const strictData = await this.requestDeepSeekCompletion(activeApiKey, strictPayload);
+            const strictData = await this.requestGroqCompletion(activeApiKey, strictPayload);
             const strictContent = strictData?.choices?.[0]?.message?.content;
             if (strictContent) {
                 const strictParsed = this.parseGeneratedContent(strictContent);
@@ -362,7 +379,7 @@ class GroqDialogueService {
                 ]
             };
 
-            const validation = await this.requestDeepSeekCompletion(apiKey, validatorPayload);
+            const validation = await this.requestGroqCompletion(apiKey, validatorPayload);
             const content = validation?.choices?.[0]?.message?.content;
             if (!content) {
                 return { isAllOnCategory: false, offCategoryIndexes: conversations.map((_, index) => index) };
@@ -434,7 +451,7 @@ class GroqDialogueService {
         };
 
         try {
-            const rewriteResponse = await this.requestDeepSeekCompletion(apiKey, rewritePayload);
+            const rewriteResponse = await this.requestGroqCompletion(apiKey, rewritePayload);
             const content = rewriteResponse?.choices?.[0]?.message?.content;
             if (!content) {
                 return conversations;
@@ -473,7 +490,7 @@ class GroqDialogueService {
         }
     }
 
-    async requestDeepSeekCompletion(apiKey, payload) {
+    async requestGroqCompletion(apiKey, payload) {
         const response = await fetch(this.apiUrl, {
             method: 'POST',
             headers: {
@@ -486,28 +503,17 @@ class GroqDialogueService {
         if (!response.ok) {
             const errText = await response.text();
 
-            // Some DeepSeek deployments may reject response_format; retry once without it.
-            if (response.status === 400 && payload?.response_format) {
-                const lowerErr = String(errText || '').toLowerCase();
-                const mentionsResponseFormat = lowerErr.includes('response_format') || lowerErr.includes('unsupported') || lowerErr.includes('invalid parameter');
-                if (mentionsResponseFormat) {
-                    const fallbackPayload = { ...payload };
-                    delete fallbackPayload.response_format;
-                    return this.requestDeepSeekCompletion(apiKey, fallbackPayload);
-                }
-            }
-
             if (this.isInvalidApiKeyError(response.status, errText)) {
                 return { __invalidApiKey: true };
             }
-            throw new Error(`DeepSeek API request failed (${response.status}): ${errText}`);
+            throw new Error(`Groq API request failed (${response.status}): ${errText}`);
         }
 
         return response.json();
     }
 
     isInvalidApiKeyError(status, errorText) {
-        if (status !== 401 && status !== 403) {
+        if (status !== 401) {
             return false;
         }
 
