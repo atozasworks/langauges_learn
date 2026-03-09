@@ -1,7 +1,8 @@
 <?php
 /**
  * Database helper — works with both XAMPP (local) and Hostinger (live).
- * Auto-creates tables `login_audit`, `otp_codes`, `learning_team`.
+ * Auto-creates database and required tables on first run.
+ * Tables: `religions`, `members`, `login_audit`, `otp_codes`, `learning_team`.
  *
  * Config priority:
  *   1. db-config.local.php  (per-environment file, not committed)
@@ -64,8 +65,8 @@ function getDbConfig(): array
     if ($envHost !== false && $envHost !== '') {
         return [
             'host'     => $envHost,
-            'port'     => (int)(getenv('DB_PORT') ?: 3307),
-            'dbname'   => getenv('DB_NAME') ?: 'lan_learn_auth',
+            'port'     => (int)(getenv('DB_PORT') ?: 3306),
+            'dbname'   => (getenv('DB_NAME') ?: (getenv('DB_DATABASE') ?: 'lldb')),
             'username' => getenv('DB_USER') ?: 'root',
             'password' => getenv('DB_PASSWORD') ?: '',
             'charset'  => 'utf8mb4',
@@ -78,8 +79,8 @@ function getDbConfig(): array
     if (!empty($env['DB_HOST'])) {
         return [
             'host'     => $env['DB_HOST'],
-            'port'     => (int)($env['DB_PORT'] ?? 3307),
-            'dbname'   => $env['DB_NAME'] ?? 'lan_learn_auth',
+            'port'     => (int)($env['DB_PORT'] ?? 3306),
+            'dbname'   => ($env['DB_NAME'] ?? ($env['DB_DATABASE'] ?? 'lldb')),
             'username' => $env['DB_USER'] ?? 'root',
             'password' => $env['DB_PASSWORD'] ?? '',
             'charset'  => 'utf8mb4',
@@ -89,8 +90,8 @@ function getDbConfig(): array
     // 4. Default XAMPP config (localhost development)
     return [
         'host'     => '127.0.0.1',
-        'port'     => 3307,
-        'dbname'   => 'lan_learn_auth',
+        'port'     => 3306,
+        'dbname'   => 'lldb',
         'username' => 'root',
         'password' => '',
         'charset'  => 'utf8mb4',
@@ -98,7 +99,7 @@ function getDbConfig(): array
 }
 
 /**
- * Returns a PDO MySQL connection. Creates DB and tables on first call.
+ * Returns a PDO MySQL connection. Creates DB and required tables on first call.
  */
 function getLoginDbConnection(): PDO
 {
@@ -109,18 +110,20 @@ function getLoginDbConnection(): PDO
 
     $c = getDbConfig();
     $host    = $c['host']     ?? '127.0.0.1';
-    $port    = (int)($c['port'] ?? 3307);
-    $dbname  = $c['dbname']   ?? 'lan_learn_auth';
+    $port    = (int)($c['port'] ?? 3306);
+    $dbname  = $c['dbname']   ?? 'lldb';
     $user    = $c['username'] ?? 'root';
     $pass    = $c['password'] ?? '';
     $charset = $c['charset']  ?? 'utf8mb4';
+    $dbIdentifier = str_replace('`', '``', $dbname);
+    $collation = ($charset === 'utf8mb4') ? 'utf8mb4_unicode_ci' : $charset . '_general_ci';
 
     // Step 1: Connect WITHOUT database to create it first
     $dsn1 = "mysql:host={$host};port={$port};charset={$charset}";
     $tmp  = new PDO($dsn1, $user, $pass, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     ]);
-    $tmp->exec("CREATE DATABASE IF NOT EXISTS `{$dbname}` CHARACTER SET {$charset} COLLATE {$charset}_unicode_ci");
+    $tmp->exec("CREATE DATABASE IF NOT EXISTS `{$dbIdentifier}` CHARACTER SET {$charset} COLLATE {$collation}");
     $tmp = null; // close
 
     // Step 2: Connect TO the database
@@ -137,10 +140,45 @@ function getLoginDbConnection(): PDO
 }
 
 /**
- * Creates login_audit and otp_codes tables if they don't exist.
+ * Creates required tables if they don't exist.
  */
 function createTables(PDO $pdo): void
 {
+    $pdo->exec(" 
+        CREATE TABLE IF NOT EXISTS `religions` (
+            `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `religion_name` VARCHAR(100) NOT NULL,
+            UNIQUE KEY `uk_religion_name` (`religion_name`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    // Seed only once (INSERT IGNORE + unique key keeps this idempotent)
+    $pdo->exec(" 
+        INSERT IGNORE INTO `religions` (`religion_name`) VALUES
+            ('Hindu'),
+            ('Muslim'),
+            ('Christian'),
+            ('Jain'),
+            ('Sikh')
+    ");
+
+    $pdo->exec(" 
+        CREATE TABLE IF NOT EXISTS `members` (
+            `id`          INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `name`        VARCHAR(100) NOT NULL,
+            `email`       VARCHAR(100) NOT NULL,
+            `phone`       VARCHAR(15)  NULL,
+            `religion_id` INT          NULL,
+            `created_at`  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX `idx_members_religion` (`religion_id`),
+            CONSTRAINT `fk_members_religion`
+                FOREIGN KEY (`religion_id`)
+                REFERENCES `religions`(`id`)
+                ON UPDATE CASCADE
+                ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS `login_audit` (
             `id`               INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,

@@ -3,8 +3,8 @@
 return [
     'driver' => 'mysql',
     'host' => '127.0.0.1',
-    'port' => 3307,
-    'dbname' => 'lan_learn_auth',
+    'port' => 3306,
+    'dbname' => 'lldb',
     'username' => 'root',
     'password' => '',
     'charset' => 'utf8mb4',
