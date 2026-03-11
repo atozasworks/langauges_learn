@@ -1,13 +1,83 @@
 <?php
 /**
- * Database helper for XAMPP MySQL (phpMyAdmin).
- * Auto-creates database `lan_learn_auth` and tables `login_audit`, `otp_codes`.
+ * MongoDB helper (MongoDB Compass / local MongoDB server).
+ *
+ * Stores authentication and learner data in MongoDB collections:
+ * - login_audit
+ * - otp_codes
+ * - learning_team
+ * - religions
+ * - members
  */
 
 error_reporting(E_ALL);
 
 /**
- * MySQL config for XAMPP.
+ * Parse a .env file into key/value pairs.
+ */
+function parseEnvFile(string $path): array
+{
+    if (!is_file($path)) {
+        return [];
+    }
+
+    $vars = [];
+    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') {
+            continue;
+        }
+        if (strpos($line, '=') === false) {
+            continue;
+        }
+
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+
+        if (preg_match('/^(["\'])(.*)\\1$/', $value, $m)) {
+            $value = $m[2];
+        }
+        if (($pos = strpos($value, ' #')) !== false) {
+            $value = rtrim(substr($value, 0, $pos));
+        }
+
+        $vars[$key] = $value;
+    }
+
+    return $vars;
+}
+
+/**
+ * Normalizes config to required Mongo keys.
+ */
+function normalizeMongoConfig(array $cfg): array
+{
+    $uri = (string) ($cfg['uri'] ?? ($cfg['mongodb_uri'] ?? ''));
+    $dbname = (string) ($cfg['dbname'] ?? ($cfg['database'] ?? ($cfg['db_name'] ?? '')));
+
+    if ($uri === '') {
+        $uri = 'mongodb://127.0.0.1:27017';
+    }
+    if ($dbname === '') {
+        $dbname = 'lldb';
+    }
+
+    return [
+        'driver' => 'mongodb',
+        'uri' => $uri,
+        'dbname' => $dbname,
+        'uriOptions' => is_array($cfg['uriOptions'] ?? null) ? $cfg['uriOptions'] : [],
+        'driverOptions' => is_array($cfg['driverOptions'] ?? null) ? $cfg['driverOptions'] : [],
+    ];
+}
+
+/**
+ * MongoDB config priority:
+ * 1. db-config.local.php
+ * 2. Environment variables
+ * 3. .env file
+ * 4. Defaults
  */
 function getDbConfig(): array
 {
@@ -15,223 +85,371 @@ function getDbConfig(): array
     if (is_file($localFile)) {
         $cfg = require $localFile;
         if (is_array($cfg)) {
-            return $cfg;
+            return normalizeMongoConfig($cfg);
         }
     }
 
-    // Default XAMPP config
-    return [
-        'host'     => '127.0.0.1',
-        'port'     => 3307,
-        'dbname'   => 'lan_learn_auth',
-        'username' => 'root',
-        'password' => '',
-        'charset'  => 'utf8mb4',
-    ];
-}
-
-/**
- * Returns a PDO MySQL connection. Creates DB and tables on first call.
- */
-function getLoginDbConnection(): PDO
-{
-    static $pdo = null;
-    if ($pdo !== null) {
-        return $pdo;
+    $envUri = getenv('MONGODB_URI') ?: getenv('MONGO_URI');
+    if ($envUri !== false && $envUri !== '') {
+        return normalizeMongoConfig([
+            'uri' => $envUri,
+            'dbname' => getenv('MONGODB_DATABASE') ?: (getenv('MONGODB_DB') ?: (getenv('DB_NAME') ?: 'lldb')),
+        ]);
     }
 
-    $c = getDbConfig();
-    $host    = $c['host']     ?? '127.0.0.1';
-    $port    = (int)($c['port'] ?? 3307);
-    $dbname  = $c['dbname']   ?? 'lan_learn_auth';
-    $user    = $c['username'] ?? 'root';
-    $pass    = $c['password'] ?? '';
-    $charset = $c['charset']  ?? 'utf8mb4';
+    $envCandidates = [
+        ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/.env',
+        dirname(__DIR__) . '/.env',
+    ];
 
-    // Step 1: Connect WITHOUT database to create it first
-    $dsn1 = "mysql:host={$host};port={$port};charset={$charset}";
-    $tmp  = new PDO($dsn1, $user, $pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    foreach ($envCandidates as $envFile) {
+        $env = parseEnvFile($envFile);
+        if (!empty($env['MONGODB_URI']) || !empty($env['MONGO_URI'])) {
+            return normalizeMongoConfig([
+                'uri' => $env['MONGODB_URI'] ?? $env['MONGO_URI'],
+                'dbname' => $env['MONGODB_DATABASE'] ?? ($env['MONGODB_DB'] ?? ($env['DB_NAME'] ?? 'lldb')),
+            ]);
+        }
+    }
+
+    return normalizeMongoConfig([
+        'uri' => 'mongodb://127.0.0.1:27017',
+        'dbname' => 'lldb',
     ]);
-    $tmp->exec("CREATE DATABASE IF NOT EXISTS `{$dbname}` CHARACTER SET {$charset} COLLATE {$charset}_unicode_ci");
-    $tmp = null; // close
-
-    // Step 2: Connect TO the database
-    $dsn2 = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
-    $pdo  = new PDO($dsn2, $user, $pass, [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
-
-    // Step 3: Create tables
-    createTables($pdo);
-
-    return $pdo;
 }
 
 /**
- * Creates login_audit and otp_codes tables if they don't exist.
+ * Returns Mongo manager + db name singleton.
  */
-function createTables(PDO $pdo): void
+function getMongoConnection(): array
 {
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS `login_audit` (
-            `id`               INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `email`            VARCHAR(255) NOT NULL,
-            `login_method`     VARCHAR(30)  NOT NULL,
-            `provider_user_id` VARCHAR(255) NULL,
-            `display_name`     VARCHAR(255) NULL,
-            `login_status`     VARCHAR(20)  NOT NULL DEFAULT 'success',
-            `client_ip`        VARCHAR(64)  NULL,
-            `user_agent`       TEXT         NULL,
-            `created_at`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS `otp_codes` (
-            `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `email`      VARCHAR(255) NOT NULL,
-            `otp_hash`   VARCHAR(255) NOT NULL,
-            `expires_at` DATETIME     NOT NULL,
-            `used_at`    DATETIME     NULL,
-            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX `idx_otp_email` (`email`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS `learning_team` (
-            `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `user_email`    VARCHAR(255) NOT NULL,
-            `learner_name`  VARCHAR(255) NOT NULL,
-            `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX `idx_lt_user` (`user_email`),
-            UNIQUE KEY `uk_user_learner` (`user_email`, `learner_name`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
+    return getMongoConnectionInternal();
 }
 
-/* ────────────────────────────────────────────
-   Learning Team helpers
-   ──────────────────────────────────────────── */
+/**
+ * Backward-compatible function name used by existing endpoints.
+ */
+function getLoginDbConnection()
+{
+    return getMongoConnection()['manager'];
+}
+
+function getMongoDbName(): string
+{
+    return getMongoConnection()['dbname'];
+}
+
+function utcNow(): MongoDB\BSON\UTCDateTime
+{
+    return new MongoDB\BSON\UTCDateTime((int) round(microtime(true) * 1000));
+}
+
+function utcFromUnix(int $seconds): MongoDB\BSON\UTCDateTime
+{
+    return new MongoDB\BSON\UTCDateTime($seconds * 1000);
+}
+
+function toUnixTimestamp($value): int
+{
+    if ($value instanceof MongoDB\BSON\UTCDateTime) {
+        return (int) $value->toDateTime()->format('U');
+    }
+
+    if (is_string($value) && $value !== '') {
+        $ts = strtotime($value);
+        return $ts === false ? 0 : $ts;
+    }
+
+    return 0;
+}
+
+function ensureCollections(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+
+    $conn = getMongoConnectionInternal();
+    $manager = $conn['manager'];
+    $db = $conn['dbname'];
+
+    // learning_team indexes
+    $manager->executeCommand($db, new MongoDB\Driver\Command([
+        'createIndexes' => 'learning_team',
+        'indexes' => [
+            ['key' => ['id' => 1], 'name' => 'idx_learning_team_id'],
+            ['key' => ['user_email' => 1], 'name' => 'idx_lt_user'],
+            ['key' => ['user_email' => 1, 'learner_name' => 1], 'name' => 'uk_user_learner', 'unique' => true],
+        ],
+    ]));
+
+    // OTP indexes
+    $manager->executeCommand($db, new MongoDB\Driver\Command([
+        'createIndexes' => 'otp_codes',
+        'indexes' => [
+            ['key' => ['email' => 1, 'used_at' => 1, 'created_at' => -1], 'name' => 'idx_otp_email_used_created'],
+        ],
+    ]));
+
+    // Audit index
+    $manager->executeCommand($db, new MongoDB\Driver\Command([
+        'createIndexes' => 'login_audit',
+        'indexes' => [
+            ['key' => ['email' => 1, 'created_at' => -1], 'name' => 'idx_login_audit_email_created'],
+        ],
+    ]));
+
+    // Extra collections kept for compatibility with existing schema usage.
+    $manager->executeCommand($db, new MongoDB\Driver\Command([
+        'createIndexes' => 'religions',
+        'indexes' => [
+            ['key' => ['religion_name' => 1], 'name' => 'uk_religion_name', 'unique' => true],
+        ],
+    ]));
+
+    $manager->executeCommand($db, new MongoDB\Driver\Command([
+        'createIndexes' => 'members',
+        'indexes' => [
+            ['key' => ['email' => 1], 'name' => 'idx_members_email'],
+            ['key' => ['religion_id' => 1], 'name' => 'idx_members_religion'],
+        ],
+    ]));
+
+    seedReligions();
+
+    $done = true;
+}
 
 /**
- * Get all learners for a specific user.
+ * Internal connection getter that avoids recursive ensureCollections() calls.
  */
+function getMongoConnectionInternal(): array
+{
+    static $conn = null;
+    if ($conn !== null) {
+        return $conn;
+    }
+
+    if (!extension_loaded('mongodb')) {
+        throw new RuntimeException('MongoDB PHP extension is not loaded. Enable ext-mongodb in php.ini.');
+    }
+
+    $cfg = getDbConfig();
+    $manager = new MongoDB\Driver\Manager(
+        $cfg['uri'],
+        $cfg['uriOptions'] ?? [],
+        $cfg['driverOptions'] ?? []
+    );
+    $manager->executeCommand('admin', new MongoDB\Driver\Command(['ping' => 1]));
+
+    $conn = [
+        'manager' => $manager,
+        'dbname' => $cfg['dbname'],
+    ];
+
+    ensureCollections();
+
+    return $conn;
+}
+
+function seedReligions(): void
+{
+    $names = ['Hindu', 'Muslim', 'Christian', 'Jain', 'Sikh'];
+
+    $bulk = new MongoDB\Driver\BulkWrite();
+    foreach ($names as $name) {
+        $bulk->update(
+            ['religion_name' => $name],
+            ['$setOnInsert' => ['religion_name' => $name]],
+            ['multi' => false, 'upsert' => true]
+        );
+    }
+
+    $conn = getMongoConnectionInternal();
+    $conn['manager']->executeBulkWrite(getMongoDbName() . '.religions', $bulk);
+}
+
+function getNextSequence(string $counterId): int
+{
+    $conn = getMongoConnectionInternal();
+    $result = $conn['manager']->executeCommand(
+        $conn['dbname'],
+        new MongoDB\Driver\Command([
+            'findAndModify' => 'counters',
+            'query' => ['_id' => $counterId],
+            'update' => ['$inc' => ['seq' => 1]],
+            'upsert' => true,
+            'new' => true,
+        ])
+    )->toArray();
+
+    $doc = $result[0] ?? null;
+    if (!is_object($doc) || !isset($doc->value) || !is_object($doc->value) || !isset($doc->value->seq)) {
+        return 1;
+    }
+
+    return (int) $doc->value->seq;
+}
+
+function isDuplicateKeyError(Throwable $e): bool
+{
+    if ($e instanceof MongoDB\Driver\Exception\BulkWriteException) {
+        $wr = $e->getWriteResult();
+        foreach ($wr->getWriteErrors() as $we) {
+            if (in_array((int) $we->getCode(), [11000, 11001], true)) {
+                return true;
+            }
+        }
+    }
+
+    return stripos($e->getMessage(), 'duplicate key') !== false;
+}
+
+/*
+ * Learning Team helpers
+ */
+
 function getLearnersByUser(string $email): array
 {
-    $pdo = getLoginDbConnection();
-    $stmt = $pdo->prepare("SELECT id, learner_name FROM `learning_team` WHERE user_email = :email ORDER BY created_at ASC");
-    $stmt->execute([':email' => $email]);
-    return $stmt->fetchAll();
+    $conn = getMongoConnectionInternal();
+    $query = new MongoDB\Driver\Query(
+        ['user_email' => $email],
+        [
+            'projection' => ['_id' => 0, 'id' => 1, 'learner_name' => 1],
+            'sort' => ['id' => 1],
+        ]
+    );
+
+    $rows = [];
+    $cursor = $conn['manager']->executeQuery($conn['dbname'] . '.learning_team', $query);
+    foreach ($cursor as $doc) {
+        $rows[] = [
+            'id' => (int) ($doc->id ?? 0),
+            'learner_name' => (string) ($doc->learner_name ?? ''),
+        ];
+    }
+
+    return $rows;
 }
 
-/**
- * Add a learner to a user's team. Returns the new row id.
- */
 function addLearner(string $email, string $name): int
 {
-    $pdo = getLoginDbConnection();
-    $stmt = $pdo->prepare("INSERT INTO `learning_team` (user_email, learner_name) VALUES (:email, :name)");
-    $stmt->execute([':email' => $email, ':name' => $name]);
-    return (int) $pdo->lastInsertId();
+    $conn = getMongoConnectionInternal();
+    $newId = getNextSequence('learning_team_id');
+
+    $bulk = new MongoDB\Driver\BulkWrite();
+    $bulk->insert([
+        'id' => $newId,
+        'user_email' => $email,
+        'learner_name' => $name,
+        'created_at' => utcNow(),
+    ]);
+
+    try {
+        $conn['manager']->executeBulkWrite($conn['dbname'] . '.learning_team', $bulk);
+    } catch (Throwable $e) {
+        if (isDuplicateKeyError($e)) {
+            throw new RuntimeException('Duplicate learner', 409, $e);
+        }
+        throw $e;
+    }
+
+    return $newId;
 }
 
-/**
- * Delete a learner from a user's team (only if it belongs to that user).
- */
 function deleteLearner(string $email, int $learnerId): bool
 {
-    $pdo = getLoginDbConnection();
-    $stmt = $pdo->prepare("DELETE FROM `learning_team` WHERE id = :id AND user_email = :email LIMIT 1");
-    $stmt->execute([':id' => $learnerId, ':email' => $email]);
-    return $stmt->rowCount() > 0;
+    $conn = getMongoConnectionInternal();
+
+    $bulk = new MongoDB\Driver\BulkWrite();
+    $bulk->delete(['id' => $learnerId, 'user_email' => $email], ['limit' => 1]);
+
+    $res = $conn['manager']->executeBulkWrite($conn['dbname'] . '.learning_team', $bulk);
+    return $res->getDeletedCount() > 0;
 }
 
-/**
- * Save a login event.
- */
 function saveLoginAudit(array $rec): void
 {
-    $pdo = getLoginDbConnection();
-    $stmt = $pdo->prepare("
-        INSERT INTO `login_audit`
-            (email, login_method, provider_user_id, display_name, login_status, client_ip, user_agent, created_at)
-        VALUES
-            (:email, :method, :pid, :name, :status, :ip, :ua, NOW())
-    ");
-    $stmt->execute([
-        ':email'  => $rec['email'] ?? '',
-        ':method' => $rec['login_method'] ?? 'unknown',
-        ':pid'    => $rec['provider_user_id'] ?? null,
-        ':name'   => $rec['display_name'] ?? null,
-        ':status' => $rec['login_status'] ?? 'success',
-        ':ip'     => $_SERVER['REMOTE_ADDR'] ?? null,
-        ':ua'     => $_SERVER['HTTP_USER_AGENT'] ?? null,
+    $conn = getMongoConnectionInternal();
+
+    $bulk = new MongoDB\Driver\BulkWrite();
+    $bulk->insert([
+        'email' => (string) ($rec['email'] ?? ''),
+        'login_method' => (string) ($rec['login_method'] ?? 'unknown'),
+        'provider_user_id' => $rec['provider_user_id'] ?? null,
+        'display_name' => $rec['display_name'] ?? null,
+        'login_status' => (string) ($rec['login_status'] ?? 'success'),
+        'client_ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+        'created_at' => utcNow(),
     ]);
+
+    $conn['manager']->executeBulkWrite($conn['dbname'] . '.login_audit', $bulk);
 }
 
-/**
- * Save OTP hash; expire previous unused OTPs for the same email.
- */
 function saveOtpCode(string $email, string $otp, int $ttl = 300): void
 {
-    $pdo = getLoginDbConnection();
+    $conn = getMongoConnectionInternal();
+    $now = utcNow();
 
-    // Expire old unused OTPs
-    $pdo->prepare("UPDATE `otp_codes` SET used_at = NOW() WHERE email = :email AND used_at IS NULL")
-        ->execute([':email' => $email]);
+    // Expire old unused OTPs.
+    $bulkExpire = new MongoDB\Driver\BulkWrite();
+    $bulkExpire->update(
+        ['email' => $email, 'used_at' => null],
+        ['$set' => ['used_at' => $now]],
+        ['multi' => true, 'upsert' => false]
+    );
+    $conn['manager']->executeBulkWrite($conn['dbname'] . '.otp_codes', $bulkExpire);
 
-    // Calculate expiry in PHP (avoids INTERVAL :param issue in some MySQL versions)
-    $expiresAt = date('Y-m-d H:i:s', time() + $ttl);
-
-    // Insert new OTP
-    $stmt = $pdo->prepare("
-        INSERT INTO `otp_codes` (email, otp_hash, expires_at, used_at, created_at)
-        VALUES (:email, :hash, :expires, NULL, NOW())
-    ");
-    $stmt->execute([
-        ':email'   => $email,
-        ':hash'    => password_hash($otp, PASSWORD_DEFAULT),
-        ':expires' => $expiresAt,
+    // Insert new OTP row.
+    $bulkInsert = new MongoDB\Driver\BulkWrite();
+    $bulkInsert->insert([
+        'email' => $email,
+        'otp_hash' => password_hash($otp, PASSWORD_DEFAULT),
+        'expires_at' => utcFromUnix(time() + $ttl),
+        'used_at' => null,
+        'created_at' => $now,
     ]);
+    $conn['manager']->executeBulkWrite($conn['dbname'] . '.otp_codes', $bulkInsert);
 }
 
-/**
- * Verify OTP — checks latest unused row for the email.
- */
 function verifyOtpCode(string $email, string $otp): bool
 {
-    $pdo = getLoginDbConnection();
+    $conn = getMongoConnectionInternal();
 
-    $stmt = $pdo->prepare("
-        SELECT id, otp_hash, expires_at
-        FROM `otp_codes`
-        WHERE email = :email AND used_at IS NULL
-        ORDER BY id DESC
-        LIMIT 1
-    ");
-    $stmt->execute([':email' => $email]);
-    $row = $stmt->fetch();
+    $query = new MongoDB\Driver\Query(
+        ['email' => $email, 'used_at' => null],
+        ['sort' => ['created_at' => -1], 'limit' => 1]
+    );
 
-    if (!$row) {
+    $cursor = $conn['manager']->executeQuery($conn['dbname'] . '.otp_codes', $query);
+    $rows = $cursor->toArray();
+    $row = $rows[0] ?? null;
+
+    if (!is_object($row)) {
         return false;
     }
 
-    // Check expiry
-    if (strtotime($row['expires_at']) < time()) {
+    $expiresAt = toUnixTimestamp($row->expires_at ?? null);
+    if ($expiresAt <= 0 || $expiresAt < time()) {
         return false;
     }
 
-    // Verify hash
-    if (!password_verify($otp, $row['otp_hash'])) {
+    $otpHash = (string) ($row->otp_hash ?? '');
+    if ($otpHash === '' || !password_verify($otp, $otpHash)) {
         return false;
     }
 
-    // Mark as used
-    $pdo->prepare("UPDATE `otp_codes` SET used_at = NOW() WHERE id = :id")
-        ->execute([':id' => $row['id']]);
+    if (isset($row->_id)) {
+        $bulk = new MongoDB\Driver\BulkWrite();
+        $bulk->update(
+            ['_id' => $row->_id],
+            ['$set' => ['used_at' => utcNow()]],
+            ['multi' => false, 'upsert' => false]
+        );
+        $conn['manager']->executeBulkWrite($conn['dbname'] . '.otp_codes', $bulk);
+    }
 
     return true;
 }

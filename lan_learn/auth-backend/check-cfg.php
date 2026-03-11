@@ -7,7 +7,9 @@ $f1 = __DIR__ . '/db-config.local.php';
 if (is_file($f1)) {
     $c = require $f1;
     if (is_array($c)) {
-        if (isset($c['password'])) { $c['password'] = '***(' . strlen($c['password']) . ')'; }
+        if (isset($c['uri'])) {
+            $c['uri'] = preg_replace('/:\/\/([^:@\/]+):([^@\/]+)@/', '://$1:***@', (string) $c['uri']);
+        }
         $out['db'] = $c;
     }
 } else { $out['db'] = 'MISSING'; }
@@ -26,7 +28,7 @@ if (is_file($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     $masked = [];
     foreach ($lines as $l) {
-        if (preg_match('/password|secret|key/i', $l) && strpos($l, '=') !== false) {
+        if (preg_match('/password|secret|key|mongo|mongodb/i', $l) && strpos($l, '=') !== false) {
             $p = explode('=', $l, 2);
             $masked[] = $p[0] . '=***';
         } else {

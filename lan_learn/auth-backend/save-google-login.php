@@ -1,6 +1,6 @@
 <?php
 /**
- * Save Google login endpoint — verifies access token and saves to MySQL.
+ * Save Google login endpoint — verifies access token and saves to MongoDB.
  */
 
 // Show errors for debugging (remove in production)
@@ -57,7 +57,7 @@ try {
         }
     }
 
-    // Method 2: file_get_contents fallback (works on XAMPP/localhost)
+    // Method 2: file_get_contents fallback (works when cURL is unavailable)
     if ($raw === false) {
         $ctx = stream_context_create([
             'http' => [
@@ -93,7 +93,7 @@ try {
         exit;
     }
 
-    // Try to save to MySQL (optional — don't block login if DB is unavailable)
+    // Try to save to MongoDB (optional — don't block login if DB is unavailable)
     $dbSaved = false;
     try {
         require_once __DIR__ . '/db.php';

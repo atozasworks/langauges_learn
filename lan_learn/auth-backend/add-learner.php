@@ -44,21 +44,13 @@ try {
         'message' => "$formattedName added to your learning team.",
         'learner' => ['id' => $newId, 'name' => $formattedName],
     ]);
-} catch (PDOException $e) {
-    // Duplicate entry check (SQLSTATE 23000)
-    if ($e->getCode() == 23000) {
+} catch (Throwable $e) {
+    if ((int)$e->getCode() === 409 || stripos($e->getMessage(), 'duplicate') !== false) {
         http_response_code(409);
         echo json_encode(['success' => false, 'message' => 'This learner already exists in your team.']);
         exit;
     }
 
-    http_response_code(500);
-    $response = ['success' => false, 'message' => 'Server error.'];
-    if (in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'])) {
-        $response['error_detail'] = $e->getMessage();
-    }
-    echo json_encode($response);
-} catch (Throwable $e) {
     http_response_code(500);
     $response = ['success' => false, 'message' => 'Server error.'];
     if (in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'])) {

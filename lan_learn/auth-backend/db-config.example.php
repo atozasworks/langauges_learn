@@ -1,15 +1,13 @@
 <?php
 
 return [
-    'driver' => 'mysql',
-    'host' => '127.0.0.1',
-    'port' => 3306,
+    'driver' => 'mongodb',
+    'uri' => 'mongodb://127.0.0.1:27017',
     'dbname' => 'lldb',
-    'username' => 'root',
-    'password' => '',
-    'charset' => 'utf8mb4',
 
-    // Optional if you switch to sqlite:
-    // 'driver' => 'sqlite',
-    // 'sqlite_path' => __DIR__ . '/data/login-audit.sqlite',
+    // Optional advanced options:
+    // 'uriOptions' => [
+    //     'authSource' => 'admin',
+    // ],
+    // 'driverOptions' => [],
 ];

@@ -1,6 +1,6 @@
 <?php
 /**
- * Verify OTP endpoint — checks OTP against MySQL, saves login_audit on success.
+ * Verify OTP endpoint — checks OTP against MongoDB, saves login_audit on success.
  */
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');

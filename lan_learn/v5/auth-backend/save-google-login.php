@@ -1,7 +1,12 @@
 <?php
 /**
- * Save Google login endpoint — verifies access token and saves to MySQL.
+ * Save Google login endpoint — verifies access token and saves to MongoDB.
  */
+
+// Show errors for debugging (remove in production)
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -20,8 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
-    require_once __DIR__ . '/db.php';
-
     $data        = json_decode(file_get_contents('php://input'), true);
     $accessToken = isset($data['accessToken']) ? trim($data['accessToken']) : '';
 
@@ -31,19 +34,51 @@ try {
         exit;
     }
 
-    // Verify token with Google
-    $ctx = stream_context_create([
-        'http' => [
-            'method'  => 'GET',
-            'header'  => "Authorization: Bearer {$accessToken}\r\n",
-            'timeout' => 15,
-        ],
-    ]);
-    $raw = @file_get_contents('https://www.googleapis.com/oauth2/v3/userinfo', false, $ctx);
+    // Verify token with Google (try cURL first, fallback to file_get_contents)
+    $raw = false;
+
+    // Method 1: cURL (works on most live servers)
+    if (function_exists('curl_init')) {
+        $ch = curl_init('https://www.googleapis.com/oauth2/v3/userinfo');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => ["Authorization: Bearer {$accessToken}"],
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        $raw = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        if ($raw === false || $httpCode !== 200) {
+            $raw = false; // fallback to file_get_contents
+            error_log("Google userinfo cURL failed: HTTP {$httpCode}, error: {$curlErr}");
+        }
+    }
+
+    // Method 2: file_get_contents fallback (works when cURL is unavailable)
+    if ($raw === false) {
+        $ctx = stream_context_create([
+            'http' => [
+                'method'  => 'GET',
+                'header'  => "Authorization: Bearer {$accessToken}\r\n",
+                'timeout' => 15,
+            ],
+        ]);
+        $raw = @file_get_contents('https://www.googleapis.com/oauth2/v3/userinfo', false, $ctx);
+    }
 
     if ($raw === false) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'message' => 'Failed to verify Google token.']);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to verify Google token.',
+            'debug'   => [
+                'curl_available' => function_exists('curl_init'),
+                'allow_url_fopen' => ini_get('allow_url_fopen'),
+            ]
+        ]);
         exit;
     }
 
@@ -58,18 +93,26 @@ try {
         exit;
     }
 
-    // Save to MySQL
-    saveLoginAudit([
-        'email'            => $email,
-        'login_method'     => 'google',
-        'provider_user_id' => $sub,
-        'display_name'     => $name,
-        'login_status'     => 'success',
-    ]);
+    // Try to save to MongoDB (optional — don't block login if DB is unavailable)
+    $dbSaved = false;
+    try {
+        require_once __DIR__ . '/db.php';
+        saveLoginAudit([
+            'email'            => $email,
+            'login_method'     => 'google',
+            'provider_user_id' => $sub,
+            'display_name'     => $name,
+            'login_status'     => 'success',
+        ]);
+        $dbSaved = true;
+    } catch (Throwable $dbErr) {
+        // DB save failed — log it but don't block Google login
+        error_log('Google login DB save failed: ' . $dbErr->getMessage());
+    }
 
     echo json_encode([
         'success' => true,
-        'message' => 'Google login saved successfully.',
+        'message' => $dbSaved ? 'Google login saved successfully.' : 'Google login verified (DB save skipped).',
         'user'    => [
             'email'   => $email,
             'name'    => $name,
@@ -80,12 +123,7 @@ try {
 
 } catch (Throwable $e) {
     http_response_code(500);
-    $resp = ['success' => false, 'message' => 'Google login save failed.'];
-
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    if (in_array($ip, ['127.0.0.1', '::1'], true)) {
-        $resp['error_detail'] = $e->getMessage();
-    }
+    $resp = ['success' => false, 'message' => 'Google login failed: ' . $e->getMessage()];
 
     echo json_encode($resp);
 }

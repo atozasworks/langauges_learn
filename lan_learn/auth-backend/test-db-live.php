@@ -4,70 +4,58 @@ header('Cache-Control: no-store');
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-echo "=== DB Connection Test v2 ===\n\n";
+echo "=== MongoDB Connection Test ===\n\n";
 
-// Load the config
-$cfg = require __DIR__ . '/db-config.local.php';
-echo "Config loaded:\n";
-echo "  host:     " . ($cfg['host'] ?? 'NOT SET') . "\n";
-echo "  port:     " . ($cfg['port'] ?? 'NOT SET') . "\n";
-echo "  dbname:   " . ($cfg['dbname'] ?? 'NOT SET') . "\n";
-echo "  username: " . ($cfg['username'] ?? 'NOT SET') . "\n";
-echo "  password: " . (isset($cfg['password']) ? str_repeat('*', strlen($cfg['password'])) . ' (' . strlen($cfg['password']) . ' chars)' : 'NOT SET') . "\n\n";
-
-// Test 1: Connect with localhost (Unix socket)
-echo "--- Test 1: localhost (Unix socket) ---\n";
-try {
-    $dsn = "mysql:host=localhost;port=3307;charset=utf8mb4";
-    $pdo = new PDO($dsn, $cfg['username'], $cfg['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 5,
-    ]);
-    echo "CONNECTED OK via localhost\n";
-    $pdo = null;
-} catch (Throwable $e) {
-    echo "FAILED: " . $e->getMessage() . "\n";
+if (!extension_loaded('mongodb')) {
+    echo "mongodb extension: NOT LOADED\n";
+    echo "Enable extension=mongodb in php.ini and restart Apache.\n";
+    exit(1);
 }
 
-// Test 2: Connect with 127.0.0.1 (TCP)
-echo "\n--- Test 2: 127.0.0.1 (TCP) ---\n";
-try {
-    $dsn = "mysql:host=127.0.0.1;port=3307;charset=utf8mb4";
-    $pdo = new PDO($dsn, $cfg['username'], $cfg['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 5,
-    ]);
-    echo "CONNECTED OK via 127.0.0.1\n";
-    $pdo = null;
-} catch (Throwable $e) {
-    echo "FAILED: " . $e->getMessage() . "\n";
+echo "mongodb extension: loaded\n\n";
+
+$cfgFile = __DIR__ . '/db-config.local.php';
+if (is_file($cfgFile)) {
+    $cfg = require $cfgFile;
+    if (!is_array($cfg)) {
+        $cfg = [];
+    }
+} else {
+    $cfg = [];
 }
 
-// Test 3: Check if database exists (using root-like access)
-echo "\n--- Test 3: Check database existence ---\n";
+$uri = (string) ($cfg['uri'] ?? 'mongodb://127.0.0.1:27017');
+$dbName = (string) ($cfg['dbname'] ?? 'lldb');
+$maskedUri = preg_replace('/:\/\/([^:@\/]+):([^@\/]+)@/', '://$1:***@', $uri);
+
+echo "Config:\n";
+echo "  uri:    {$maskedUri}\n";
+echo "  dbname: {$dbName}\n\n";
+
 try {
-    $dsn = "mysql:host=localhost;charset=utf8mb4";
-    $pdo = new PDO($dsn, $cfg['username'], $cfg['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 5,
-    ]);
-    $stmt = $pdo->query("SHOW DATABASES");
-    $dbs = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    echo "Databases visible: " . implode(', ', $dbs) . "\n";
+    $manager = new MongoDB\Driver\Manager($uri);
+    $ping = $manager->executeCommand('admin', new MongoDB\Driver\Command(['ping' => 1]))->toArray();
+    echo "Ping: OK\n";
+    if (!empty($ping)) {
+        echo "Ping response: " . json_encode($ping[0], JSON_UNESCAPED_SLASHES) . "\n";
+    }
 } catch (Throwable $e) {
-    echo "FAILED: " . $e->getMessage() . "\n";
+    echo "Ping FAILED: " . $e->getMessage() . "\n";
+    exit(1);
 }
 
-echo "\n--- Test 4: Connect directly to specific database ---\n";
+echo "\nListing collections in {$dbName}:\n";
 try {
-    $dsn = "mysql:host=localhost;dbname=" . $cfg['dbname'] . ";charset=utf8mb4";
-    $pdo = new PDO($dsn, $cfg['username'], $cfg['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 5,
-    ]);
-    echo "CONNECTED to " . $cfg['dbname'] . " OK!\n";
+    $list = $manager->executeCommand($dbName, new MongoDB\Driver\Command(['listCollections' => 1]))->toArray();
+    if (empty($list[0]->cursor->firstBatch ?? [])) {
+        echo "  (no collections yet)\n";
+    } else {
+        foreach ($list[0]->cursor->firstBatch as $c) {
+            echo "  - " . ($c->name ?? 'unknown') . "\n";
+        }
+    }
 } catch (Throwable $e) {
-    echo "FAILED: " . $e->getMessage() . "\n";
+    echo "listCollections FAILED: " . $e->getMessage() . "\n";
 }
 
 echo "\nDone.\n";

@@ -1,13 +1,10 @@
 <?php
 /**
- * XAMPP MySQL config — no password for root by default.
- * Database: lan_learn_auth (auto-created by db.php)
+ * Local MongoDB Compass config.
  */
 return [
-    'host'     => '127.0.0.1',
-    'port'     => 3307,
-    'dbname'   => 'lan_learn_auth',
-    'username' => 'root',
-    'password' => '',
-    'charset'  => 'utf8mb4',
+    'driver' => 'mongodb',
+    'uri' => 'mongodb://localhost:27017',
+    'dbname' => 'lldb',
 ];
+

@@ -2,13 +2,14 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-echo "=== Testing DB Connection ===\n";
+echo "=== Testing MongoDB Connection ===\n";
 try {
     require_once __DIR__ . '/db.php';
-    $pdo = getLoginDbConnection();
-    echo "DB Connection: OK\n";
+    $manager = getLoginDbConnection();
+    $manager->executeCommand('admin', new MongoDB\Driver\Command(['ping' => 1]));
+    echo "MongoDB Connection: OK\n";
 } catch (Throwable $e) {
-    echo "DB Error: " . $e->getMessage() . "\n";
+    echo "MongoDB Error: " . $e->getMessage() . "\n";
     echo "File: " . $e->getFile() . ":" . $e->getLine() . "\n";
     exit(1);
 }

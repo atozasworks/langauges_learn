@@ -1,6 +1,6 @@
 <?php
 /**
- * Send OTP endpoint — generates 4-digit OTP, saves to MySQL, sends via SMTP.
+ * Send OTP endpoint — generates 4-digit OTP, saves to MongoDB, sends via SMTP.
  */
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -35,7 +35,7 @@ try {
     // Generate 4-digit OTP
     $otp = str_pad((string)random_int(0, 9999), 4, '0', STR_PAD_LEFT);
 
-    // Save to MySQL
+    // Save to MongoDB
     saveOtpCode($email, $otp, 300);
 
     // Send via SMTP
@@ -48,7 +48,7 @@ try {
     
     // Classify the error for a useful client message
     $msg = $e->getMessage();
-    if (stripos($msg, 'Access denied') !== false || stripos($msg, 'SQLSTATE') !== false) {
+    if (stripos($msg, 'MongoDB') !== false || stripos($msg, 'mongodb') !== false) {
         $clientMsg = 'Database connection failed. Please contact support.';
     } elseif (stripos($msg, 'SMTP') !== false || stripos($msg, 'fsockopen') !== false) {
         $clientMsg = 'Email service unavailable. Please try again later.';
