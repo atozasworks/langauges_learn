@@ -5,6 +5,7 @@ A standalone language learning application extracted from the GTongue project, b
 ## Features
 
 - **Learner Management**: Add, select, and manage learners
+- **Admin Panel**: View, create, edit, and delete learner records in the database
 - **Interactive Dialogues**: Practice conversations with personalized learner names
 - **Multi-language Translation**: Translate the entire application to 30+ languages using Google Translate
 - **Navigation**: Navigate through conversations and individual lines
@@ -46,6 +47,15 @@ python -m SimpleHTTPServer 3000
 3. **Choose Language**: Select your preferred language from the dropdown in the navigation
 4. **Start Learning**: Click "Start Learning" to begin the dialogue
 5. **Navigate**: Use the buttons to move through conversations and lines
+
+### Admin Panel Setup
+
+The project includes `admin-panel.html` for database CRUD on `learning_team`.
+
+1. Open `admin-panel.html`
+2. If not logged in, you are redirected to `login-modal.html`
+3. After successful login, you are redirected back to the admin panel
+4. Use CRUD actions to manage learner rows for your logged-in email
 
 ### Translation Features
 

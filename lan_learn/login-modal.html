@@ -17,6 +17,11 @@
       <p class="modal-subtitle">Choose one secure login option.</p>
 
       <form id="loginForm" novalidate>
+        <div class="name-input-group">
+          <label class="field-label" for="loginName">Your Name</label>
+          <input id="loginName" name="loginName" type="text" autocomplete="name" placeholder="Enter your name" required />
+        </div>
+
         <div class="login-methods" role="group" aria-label="Login options">
           <!-- Google login option -->
           <button

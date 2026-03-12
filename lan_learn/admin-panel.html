@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GTongue Admin Panel</title>
+    <meta name="description" content="Admin panel for managing learner records in MongoDB." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles/admin-panel.css" />
+  </head>
+  <body>
+    <div class="page-bg" aria-hidden="true"></div>
+    <main class="admin-layout">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Database Console</p>
+          <h1>Admin Panel</h1>
+          <p class="subtitle">Manage learner records with full CRUD operations.</p>
+        </div>
+        <a class="back-link" href="index.html">Back To App</a>
+      </header>
+
+      <section id="crud-panel" class="card panel-card" aria-live="polite">
+        <div class="panel-topbar">
+          <h2>Learners (`learning_team`)</h2>
+          <div class="top-actions">
+            <button id="refresh-btn" class="btn btn-ghost" type="button">Refresh</button>
+            <button id="lock-btn" class="btn btn-danger" type="button">Lock Panel</button>
+          </div>
+        </div>
+
+        <form id="create-form" class="grid-form" autocomplete="off">
+          <input id="create-email" type="email" placeholder="User email" readonly required />
+          <input id="create-name" type="text" placeholder="Learner name" minlength="2" required />
+          <button type="submit" class="btn btn-primary">Add Learner</button>
+        </form>
+
+        <form id="filter-form" class="grid-form compact" autocomplete="off">
+          <input id="filter-search" type="text" placeholder="Search name or email" />
+          <div class="inline-actions">
+            <button type="submit" class="btn btn-ghost">Apply Filter</button>
+            <button type="button" id="reset-filter-btn" class="btn btn-ghost">Reset</button>
+          </div>
+        </form>
+
+        <p id="status-text" class="status-text">Ready.</p>
+
+        <div class="table-wrap">
+          <table class="data-table" id="learners-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>User Email</th>
+                <th>Learner Name</th>
+                <th>Created</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="learners-tbody">
+              <tr>
+                <td colspan="6" class="empty">Loading learner records...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="js/admin-panel.js"></script>
+  </body>
+</html>

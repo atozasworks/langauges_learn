@@ -57,7 +57,7 @@ function normalizeMongoConfig(array $cfg): array
     $dbname = (string) ($cfg['dbname'] ?? ($cfg['database'] ?? ($cfg['db_name'] ?? '')));
 
     if ($uri === '') {
-        $uri = 'mongodb://127.0.0.1:27017';
+        $uri = 'mongodb://lldbUser:lldb4230@93.127.198.161:28642';
     }
     if ($dbname === '') {
         $dbname = 'lldb';
@@ -367,6 +367,29 @@ function deleteLearner(string $email, int $learnerId): bool
 
     $res = $conn['manager']->executeBulkWrite($conn['dbname'] . '.learning_team', $bulk);
     return $res->getDeletedCount() > 0;
+}
+
+function updateLearner(string $email, int $learnerId, string $name): bool
+{
+    $conn = getMongoConnectionInternal();
+
+    $bulk = new MongoDB\Driver\BulkWrite();
+    $bulk->update(
+        ['id' => $learnerId, 'user_email' => $email],
+        ['$set' => ['learner_name' => $name, 'updated_at' => utcNow()]],
+        ['multi' => false, 'upsert' => false]
+    );
+
+    try {
+        $res = $conn['manager']->executeBulkWrite($conn['dbname'] . '.learning_team', $bulk);
+    } catch (Throwable $e) {
+        if (isDuplicateKeyError($e)) {
+            throw new RuntimeException('Duplicate learner', 409, $e);
+        }
+        throw $e;
+    }
+
+    return $res->getMatchedCount() > 0;
 }
 
 function saveLoginAudit(array $rec): void

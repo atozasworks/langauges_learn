@@ -1,4 +1,13 @@
 (() => {
+  const params = new URLSearchParams(window.location.search);
+  const redirectParamRaw = (params.get("redirect") || "").trim();
+  const safeRedirectTarget =
+    redirectParamRaw &&
+    !/^https?:\/\//i.test(redirectParamRaw) &&
+    !redirectParamRaw.startsWith("//")
+      ? redirectParamRaw
+      : "";
+
   const loginForm = document.getElementById("loginForm");
   const loginNameInput = document.getElementById("loginName");
   const googleOption = document.getElementById("googleOption");
@@ -194,6 +203,11 @@
     // Show success briefly, then close modal
     formSuccess.textContent = `Welcome, ${name}!`;
     setTimeout(() => {
+      if (safeRedirectTarget) {
+        window.location.href = safeRedirectTarget;
+        return;
+      }
+
       closeModal();
       // Reset form for next time
       formError.textContent = "";
