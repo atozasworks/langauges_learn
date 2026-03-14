@@ -286,24 +286,37 @@ if (document.readyState === 'loading') {
 // Register service worker
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        // Try both relative paths for flexibility
-        const swPath = './sw.js';
-        navigator.serviceWorker.register(swPath)
-            .then((registration) => {
+        const swUrl = new URL('./sw.js', window.location.href);
+
+        navigator.serviceWorker.register(swUrl.pathname, { scope: './' })
+            .then(async (registration) => {
                 console.log('ServiceWorker registration successful:', registration.scope);
-                // Check for updates
-                registration.update();
+                // Prevent uncaught promise errors when update fetch fails on flaky local servers.
+                try {
+                    await registration.update();
+                } catch (updateError) {
+                    console.warn('ServiceWorker update check skipped:', updateError);
+                }
             })
-            .catch((error) => {
+            .catch(async (error) => {
                 console.log('ServiceWorker registration failed:', error);
-                // Try absolute path as fallback
-                navigator.serviceWorker.register('/sw.js')
-                    .then((registration) => {
-                        console.log('ServiceWorker registration successful (absolute path):', registration.scope);
-                    })
-                    .catch((err) => {
-                        console.log('ServiceWorker registration failed (both paths):', err);
-                    });
+
+                // Recovery: remove stale registrations for this scope and retry once.
+                try {
+                    const expectedScopePath = new URL('./', window.location.href).pathname;
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+
+                    await Promise.all(
+                        registrations
+                            .filter((reg) => reg.scope.startsWith(window.location.origin + expectedScopePath))
+                            .map((reg) => reg.unregister())
+                    );
+
+                    const retried = await navigator.serviceWorker.register(swUrl.pathname, { scope: './' });
+                    console.log('ServiceWorker registration successful after cleanup:', retried.scope);
+                } catch (retryError) {
+                    console.error('ServiceWorker registration retry failed:', retryError);
+                }
             });
     });
 }

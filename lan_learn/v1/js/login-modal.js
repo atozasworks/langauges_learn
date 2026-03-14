@@ -1,6 +1,8 @@
 // Login modal and auth state
 (function () {
-    const AUTH_BASE = 'auth-backend';
+    const API_BASE = '/api';
+    const GOOGLE_CLIENT_ID = '444024521791-26vj3nj553l540pjhofsgnk9tv2du5gh.apps.googleusercontent.com';
+    let googleTokenClient = null;
 
     function getLoginModal() {
         return document.getElementById('login-modal');
@@ -70,16 +72,71 @@
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
-    async function checkAuth() {
+    function getSavedUser() {
         try {
-            const res = await fetch(AUTH_BASE + '/check-session.php', { credentials: 'include' });
-            const data = await res.json().catch(() => ({}));
-            if (data && data.logged_in && data.user) {
-                updateNavLoginButton(true, data.user.name || data.user.email);
-                return true;
-            }
-        } catch (e) {
-            console.warn('Auth check failed', e);
+            const raw = sessionStorage.getItem('loggedInUser');
+            if (!raw) return null;
+            const user = JSON.parse(raw);
+            if (user && user.email) return user;
+            return null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function saveUser(user) {
+        sessionStorage.setItem('loggedInUser', JSON.stringify(user));
+    }
+
+    function clearUser() {
+        sessionStorage.removeItem('loggedInUser');
+    }
+
+    async function fetchGoogleProfile(accessToken) {
+        const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch Google profile.');
+        return response.json();
+    }
+
+    async function saveGoogleLogin(accessToken) {
+        const response = await fetch(`${API_BASE}/save-google-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accessToken })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Failed to save Google login.');
+        }
+        return data;
+    }
+
+    function ensureGoogleTokenClient() {
+        if (googleTokenClient) return googleTokenClient;
+        if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+            return null;
+        }
+        googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: 'openid email profile',
+            callback: () => {}
+        });
+        return googleTokenClient;
+    }
+
+    function onLoginSuccess(user) {
+        saveUser(user);
+        hideLoginModal();
+        updateNavLoginButton(true, user.name || user.email);
+    }
+
+    async function checkAuth() {
+        const user = getSavedUser();
+        if (user) {
+            updateNavLoginButton(true, user.name || user.email);
+            return true;
         }
         updateNavLoginButton(false);
         return false;
@@ -89,10 +146,51 @@
     document.getElementById('nav-login-btn')?.addEventListener('click', function (e) {
         e.preventDefault();
         if (this.getAttribute('data-logged-in') === 'true') {
-            window.location.href = AUTH_BASE + '/logout.php';
+            clearUser();
+            updateNavLoginButton(false);
             return;
         }
         showLoginModal();
+    });
+
+    // Google sign-in
+    document.getElementById('login-google-btn')?.addEventListener('click', async function (e) {
+        e.preventDefault();
+        clearLoginError();
+
+        const tokenClient = ensureGoogleTokenClient();
+        if (!tokenClient) {
+            setLoginError('Google login is not ready. Refresh and try again.');
+            return;
+        }
+
+        const btn = this;
+        btn.disabled = true;
+        try {
+            const tokenResponse = await new Promise((resolve, reject) => {
+                tokenClient.callback = (response) => {
+                    if (response.error) {
+                        reject(new Error(response.error));
+                        return;
+                    }
+                    resolve(response);
+                };
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            });
+
+            const profile = await fetchGoogleProfile(tokenResponse.access_token);
+            await saveGoogleLogin(tokenResponse.access_token);
+
+            const user = {
+                name: profile.name || profile.email,
+                email: profile.email
+            };
+            onLoginSuccess(user);
+        } catch (err) {
+            setLoginError('Google login failed. Please try again.');
+        } finally {
+            btn.disabled = false;
+        }
     });
 
     // Close modal
@@ -116,10 +214,9 @@
         const btn = this;
         btn.disabled = true;
         try {
-            const res = await fetch(AUTH_BASE + '/send-otp.php', {
+            const res = await fetch(`${API_BASE}/send-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
                 body: JSON.stringify({ email: email })
             });
             const data = await res.json().catch(() => ({}));
@@ -144,22 +241,24 @@
         const otp = (otpInput && otpInput.value.trim()) || '';
         clearLoginError();
         if (!email || !otp) {
-            setLoginError('Please enter the 6-digit code from your email.');
+            setLoginError('Please enter the 4-digit code from your email.');
             return;
         }
         const btn = this;
         btn.disabled = true;
         try {
-            const res = await fetch(AUTH_BASE + '/verify-otp.php', {
+            const res = await fetch(`${API_BASE}/verify-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
                 body: JSON.stringify({ email: email, otp: otp })
             });
             const data = await res.json().catch(() => ({}));
             if (data.success) {
-                hideLoginModal();
-                updateNavLoginButton(true, data.user && (data.user.name || data.user.email));
+                const user = {
+                    name: email.split('@')[0],
+                    email: email
+                };
+                onLoginSuccess(user);
             } else {
                 setLoginError(data.message || 'Invalid or expired code. Please try again.');
             }

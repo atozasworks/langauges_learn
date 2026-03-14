@@ -2,10 +2,11 @@
   "name": "gtongue-learn-standalone",
   "version": "1.0.0",
   "description": "A standalone language learning application extracted from GTongue project",
-  "main": "index.html",
+  "main": "server.js",
   "scripts": {
-    "start": "echo 'Open index.html in your browser to start the application'",
-    "serve": "npx http-server . -p 3000 -o",
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "serve-static": "npx http-server . -p 3000 -o",
     "lint": "echo 'No linting configured for standalone HTML/CSS/JS project'"
   },
   "keywords": [
@@ -27,7 +28,15 @@
     "url": "https://github.com/atozats/GLearn.git"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "mongodb": "^6.20.0",
+    "nodemailer": "^7.0.6"
   },
   "devDependencies": {
     "http-server": "^14.1.1"

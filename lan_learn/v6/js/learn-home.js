@@ -152,7 +152,7 @@ class LearnHome {
         }
 
         try {
-            const res = await fetch('./auth-backend/add-learner.php', {
+            const res = await fetch('/api/add-learner', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: this.loggedInUser.email, name: formattedName })
@@ -197,7 +197,7 @@ class LearnHome {
         const id = this.pendingDeleteId;
 
         try {
-            const res = await fetch('./auth-backend/delete-learner.php', {
+            const res = await fetch('/api/delete-learner', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: this.loggedInUser.email, learner_id: id })
@@ -370,7 +370,7 @@ class LearnHome {
         if (!this.loggedInUser) return;
 
         try {
-            const url = `./auth-backend/get-learners.php?email=${encodeURIComponent(this.loggedInUser.email)}`;
+            const url = `/api/get-learners?email=${encodeURIComponent(this.loggedInUser.email)}`;
             const res = await fetch(url);
             const data = await res.json();
 

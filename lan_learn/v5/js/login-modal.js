@@ -97,7 +97,7 @@
     sendOtpBtn.textContent = "Sending...";
 
     try {
-      const response = await fetch("./auth-backend/send-otp.php", {
+      const response = await fetch("/api/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
@@ -289,7 +289,7 @@
   }
 
   async function saveGoogleLoginToDatabase(accessToken) {
-    const response = await fetch("./auth-backend/save-google-login.php", {
+    const response = await fetch("/api/save-google-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ accessToken })
@@ -386,7 +386,7 @@
     }
 
     try {
-      const response = await fetch("./auth-backend/verify-otp.php", {
+      const response = await fetch("/api/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp })

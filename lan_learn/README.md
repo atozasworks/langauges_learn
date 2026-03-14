@@ -1,6 +1,12 @@
 # GTongue Learn - Standalone Language Learning Platform
 
-A standalone language learning application extracted from the GTongue project, built with plain HTML, CSS, and JavaScript.
+A standalone language learning application extracted from the GTongue project, built with plain HTML, CSS, JavaScript, and a Node.js + MongoDB backend.
+
+## Backend Migration Status
+
+- XAMPP/PHP backend is replaced by a Node.js server (`server.js`).
+- MongoDB Compass is the primary database via `MONGODB_URI` and `MONGODB_DB`.
+- Existing frontend endpoint paths (for example `auth-backend/send-otp.php`) are now served by Node routes for compatibility.
 
 ## Features
 
@@ -17,27 +23,39 @@ A standalone language learning application extracted from the GTongue project, b
 
 ### Prerequisites
 
+- Node.js 18+
+- MongoDB running locally or remotely (MongoDB Compass URI)
 - A modern web browser (Chrome, Firefox, Safari, Edge)
-- No server or build process required!
 
 ### Installation
 
-1. Clone or download this project
-2. Open `index.html` in your web browser
-3. Start learning!
-
-**Note**: The application works directly in the browser without any server. However, if you encounter any file loading issues, you can run it with a local server:
+1. Clone or download this project.
+2. In `AtoZ_Services/lan_learn`, install dependencies:
 
 ```bash
-# Using Node.js http-server
-npx http-server . -p 3000 -o
-
-# Using Python (Python 3)
-python -m http.server 3000
-
-# Using Python (Python 2)
-python -m SimpleHTTPServer 3000
+npm install
 ```
+
+3. Create your environment file:
+
+```bash
+cp .env.example .env
+```
+
+4. Update `.env` with your MongoDB Compass connection:
+
+```bash
+MONGODB_URI=mongodb://127.0.0.1:27017
+MONGODB_DB=lldb
+```
+
+5. Start the full app (frontend + API) with Node:
+
+```bash
+npm run dev
+```
+
+6. Open `http://localhost:3000` in your browser.
 
 ### Usage
 
@@ -151,7 +169,8 @@ The application includes two translation approaches:
 - Language detection capabilities
 
 ### Data Persistence
-All learner data and language preferences are stored locally in your browser using localStorage. No data is sent to external servers.
+- Learners, OTP records, and login audit records are stored in MongoDB.
+- Learner selections and UI preferences are still stored in browser localStorage/sessionStorage.
 
 ## Browser Support
 
@@ -159,6 +178,18 @@ All learner data and language preferences are stored locally in your browser usi
 - Firefox 65+
 - Safari 12+
 - Edge 79+
+
+## Backend Configuration
+
+### Required
+
+- `MONGODB_URI`: MongoDB connection string (Compass-compatible)
+- `MONGODB_DB`: Database name
+
+### Optional (OTP Email)
+
+- `SMTP_SERVER`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_EMAIL`, `SMTP_PASSWORD`, `SMTP_NAME`
+- If SMTP is not configured in development mode, OTP is generated and logged by the Node server.
 
 ## Advanced Setup (Optional)
 

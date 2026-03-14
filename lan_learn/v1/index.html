@@ -33,6 +33,7 @@
     <!-- jQuery and DataTables JS -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <!-- Navigation -->
@@ -434,7 +435,7 @@
         <p class="login-modal-subtitle">Choose how you want to sign in</p>
 
         <div class="login-options">
-          <a href="auth-backend/google-login.php" id="login-google-btn" class="login-option-btn login-google-btn">
+          <a href="#" id="login-google-btn" class="login-option-btn login-google-btn">
             <i data-lucide="mail"></i>
             <span>Continue with Google</span>
           </a>
@@ -448,8 +449,8 @@
             <input type="email" id="login-email" class="login-input" placeholder="your@gmail.com" autocomplete="email" />
             <button type="button" id="send-otp-btn" class="login-option-btn login-otp-send-btn">Send OTP</button>
             <p id="login-otp-sent-msg" class="login-otp-sent-msg" style="display: none;">Check your inbox for the code.</p>
-            <label for="login-otp" class="login-label" style="display: none;" id="otp-label">Enter 6-digit code</label>
-            <input type="text" id="login-otp" class="login-input" placeholder="000000" maxlength="6" pattern="[0-9]*" inputmode="numeric" style="display: none;" />
+            <label for="login-otp" class="login-label" style="display: none;" id="otp-label">Enter 4-digit code</label>
+            <input type="text" id="login-otp" class="login-input" placeholder="0000" maxlength="4" pattern="[0-9]*" inputmode="numeric" style="display: none;" />
             <button type="button" id="verify-otp-btn" class="login-option-btn login-otp-verify-btn" style="display: none;">Verify & sign in</button>
           </div>
         </div>
