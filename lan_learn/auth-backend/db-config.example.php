@@ -2,7 +2,7 @@
 
 return [
     'driver' => 'mongodb',
-    'uri' => 'mongodb://127.0.0.1:27017',
+    'uri' => 'mongodb://localhost:27017',
     'dbname' => 'lldb',
 
     // Optional advanced options:

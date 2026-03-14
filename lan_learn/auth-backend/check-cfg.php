@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/diagnostics-guard.php';
+requireDiagnosticsAccess('json');
+
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 $out = ['v'=>3];

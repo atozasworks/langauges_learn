@@ -4,6 +4,9 @@
  * URL: http://localhost/AtoZ_Services/lan_learn/auth-backend/test-db.php
  */
 
+require_once __DIR__ . '/diagnostics-guard.php';
+requireDiagnosticsAccess('html');
+
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 

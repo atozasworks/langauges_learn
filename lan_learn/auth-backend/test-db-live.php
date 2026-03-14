@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/diagnostics-guard.php';
+requireDiagnosticsAccess('text');
+
 header('Content-Type: text/plain');
 header('Cache-Control: no-store');
 error_reporting(E_ALL);

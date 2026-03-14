@@ -1,0 +1,27 @@
+Subject: Enable PHP MongoDB extension (ext-mongodb) for my domain
+
+Hello Support Team,
+
+I need MongoDB support enabled for my website.
+
+Domain: ulsaapp.online
+Application path: /auth-backend/
+Current test URL: https://ulsaapp.online/auth-backend/test-db-live.php
+
+Current issue shown by test script:
+"mongodb extension: NOT LOADED"
+
+Please do the following for my hosting account:
+1) Enable PHP extension: mongodb (ext-mongodb)
+2) Ensure it is enabled for the active PHP version used by my domain
+3) Restart PHP/Apache handler if required
+4) Confirm the extension is loaded for web requests (not only CLI)
+
+After enabling, I will verify using:
+https://ulsaapp.online/auth-backend/test-db-live.php
+
+Expected output:
+- mongodb extension: loaded
+- Ping: OK
+
+Thank you.

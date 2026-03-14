@@ -3,6 +3,9 @@
  * Temporary diagnostic script to discover server environment.
  * DELETE THIS FILE after getting the info.
  */
+require_once __DIR__ . '/diagnostics-guard.php';
+requireDiagnosticsAccess('json');
+
 header('Content-Type: application/json');
 
 $info = [
