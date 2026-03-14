@@ -31,7 +31,6 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
@@ -46,4 +45,4 @@
     "last 2 versions",
     "not dead"
   ]
-} 
+}

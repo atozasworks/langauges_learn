@@ -3,7 +3,6 @@ const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
 const { MongoClient } = require("mongodb");
 
@@ -21,6 +20,7 @@ app.use(express.json({ limit: "1mb" }));
 let mongoClient = null;
 let dbInstance = null;
 let smtpTransporter = null;
+let otpSchemaMigrated = false;
 
 function isEmailValid(email) {
   if (typeof email !== "string") {
@@ -58,7 +58,32 @@ async function getDb() {
   await mongoClient.connect();
   dbInstance = mongoClient.db(MONGODB_DB);
   await ensureIndexes(dbInstance);
+  await ensureOtpSchema(dbInstance);
   return dbInstance;
+}
+
+async function ensureOtpSchema(db) {
+  if (otpSchemaMigrated) {
+    return;
+  }
+
+  const otpCodes = db.collection("otp_codes");
+
+  // Legacy `otp_hash` values are one-way hashes; keep them unusable and normalize schema.
+  await otpCodes.updateMany(
+    { otp: { $exists: false }, otp_hash: { $exists: true }, used_at: null },
+    { $set: { used_at: new Date() } }
+  );
+
+  await otpCodes.updateMany(
+    { otp: { $exists: false }, otp_hash: { $exists: true } },
+    {
+      $set: { otp: null, migrated_at: new Date() },
+      $unset: { otp_hash: "" },
+    }
+  );
+
+  otpSchemaMigrated = true;
 }
 
 async function ensureIndexes(db) {
@@ -85,6 +110,9 @@ async function ensureIndexes(db) {
   const otpIndexes = await otpCodes.indexes();
   if (!hasKeyIndex(otpIndexes, { email: 1, created_at: -1 })) {
     await otpCodes.createIndex({ email: 1, created_at: -1 });
+  }
+  if (!hasKeyIndex(otpIndexes, { email: 1, otp: 1, used_at: 1, created_at: -1 })) {
+    await otpCodes.createIndex({ email: 1, otp: 1, used_at: 1, created_at: -1 });
   }
 
   const auditIndexes = await loginAudit.indexes();
@@ -185,11 +213,10 @@ async function saveOtpCode(email, otp, ttlSeconds) {
   );
 
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-  const otpHash = await bcrypt.hash(otp, 10);
 
   await otpCol.insertOne({
     email,
-    otp_hash: otpHash,
+    otp,
     expires_at: expiresAt,
     used_at: null,
     created_at: new Date(),
@@ -201,7 +228,7 @@ async function verifyOtpCode(email, otp) {
   const otpCol = db.collection("otp_codes");
 
   const doc = await otpCol.findOne(
-    { email, used_at: null },
+    { email, otp, used_at: null },
     { sort: { created_at: -1 } }
   );
 
@@ -213,13 +240,8 @@ async function verifyOtpCode(email, otp) {
     return false;
   }
 
-  const matched = await bcrypt.compare(otp, doc.otp_hash || "");
-  if (!matched) {
-    return false;
-  }
-
   await otpCol.updateOne(
-    { _id: doc._id },
+    { _id: doc._id, used_at: null },
     { $set: { used_at: new Date() } }
   );
 
