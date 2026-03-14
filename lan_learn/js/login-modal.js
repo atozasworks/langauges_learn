@@ -4,6 +4,11 @@
   const googleOption = document.getElementById("googleOption");
   const otpEmail = document.getElementById("otpEmail");
   const sendOtpBtn = document.getElementById("sendOtpBtn");
+  const smtpDebugPanel = document.getElementById("smtpDebugPanel");
+  const smtpHealthBtn = document.getElementById("smtpHealthBtn");
+  const smtpTestBtn = document.getElementById("smtpTestBtn");
+  const smtpDebugHint = document.getElementById("smtpDebugHint");
+  const smtpDebugResult = document.getElementById("smtpDebugResult");
   const otpDigits = Array.from(document.querySelectorAll(".otp-digit"));
   const modeHint = document.getElementById("modeHint");
   const formError = document.getElementById("formError");
@@ -25,6 +30,13 @@
   let googleTokenClient = null;
   let googleProfile = null;
   let otpRequestedForEmail = "";
+
+  const isLocalHost =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "::1";
+  const forceSmtpDebug = new URLSearchParams(window.location.search).get("smtpDebug") === "1";
+  const canShowSmtpDebug = isLocalHost || forceSmtpDebug;
 
   const googleClientId =
     googleOption.getAttribute("data-client-id") ||
@@ -61,6 +73,104 @@
   otpEmail.addEventListener("input", () => {
     otpRequestedForEmail = "";
   });
+
+  setupSmtpDebugPanel();
+
+  function setupSmtpDebugPanel() {
+    if (!smtpDebugPanel || !smtpHealthBtn || !smtpTestBtn || !smtpDebugResult) {
+      return;
+    }
+
+    if (!canShowSmtpDebug) {
+      smtpDebugPanel.hidden = true;
+      return;
+    }
+
+    smtpDebugPanel.hidden = false;
+
+    smtpHealthBtn.addEventListener("click", async () => {
+      await runSmtpDebugRequest("check");
+    });
+
+    smtpTestBtn.addEventListener("click", async () => {
+      await runSmtpDebugRequest("test");
+    });
+  }
+
+  function renderSmtpDebugResult(title, payload, isError = false) {
+    if (!smtpDebugResult) {
+      return;
+    }
+
+    const formatted = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+    smtpDebugResult.textContent = `${title}\n${formatted}`;
+    smtpDebugResult.classList.add("show");
+    smtpDebugResult.style.color = isError ? "#ffb4b4" : "#c8f5da";
+  }
+
+  function setSmtpDebugBusy(isBusy) {
+    if (!smtpHealthBtn || !smtpTestBtn) {
+      return;
+    }
+
+    smtpHealthBtn.disabled = isBusy;
+    smtpTestBtn.disabled = isBusy;
+
+    if (smtpDebugHint) {
+      smtpDebugHint.textContent = isBusy
+        ? "Checking SMTP..."
+        : "Visible only on localhost / debug mode.";
+    }
+  }
+
+  async function runSmtpDebugRequest(mode) {
+    const endpoint = "/api/smtp-health";
+    setSmtpDebugBusy(true);
+
+    try {
+      let response;
+
+      if (mode === "check") {
+        response = await fetch(endpoint, { method: "GET" });
+      } else {
+        const email = otpEmail.value.trim();
+        if (!email) {
+          renderSmtpDebugResult("SMTP Test Failed", "Enter email first to send test mail.", true);
+          return;
+        }
+
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        });
+      }
+
+      const payload = await response.json().catch(() => ({ success: false, message: "Non-JSON response" }));
+
+      if (!response.ok || !payload.success) {
+        renderSmtpDebugResult(
+          mode === "check" ? "SMTP Check Failed" : "SMTP Test Failed",
+          payload,
+          true
+        );
+        return;
+      }
+
+      renderSmtpDebugResult(
+        mode === "check" ? "SMTP Check OK" : "SMTP Test Mail Sent",
+        payload
+      );
+    } catch (error) {
+      renderSmtpDebugResult(
+        mode === "check" ? "SMTP Check Error" : "SMTP Test Error",
+        error?.message || "Unexpected error",
+        true
+      );
+    } finally {
+      setSmtpDebugBusy(false);
+    }
+  }
 
   // ─── Google button click ───
   googleOption.addEventListener("click", async () => {
@@ -393,8 +503,8 @@
     const otp = otpDigits.map((digit) => digit.value.trim()).join("");
     const email = otpEmail.value.trim();
 
-    if (!email || otp.length !== 4) {
-      formError.textContent = "Enter your Gmail and complete all 4 OTP digits.";
+    if (!email || otp.length !== 6) {
+      formError.textContent = "Enter your Gmail and complete all 6 OTP digits.";
       return;
     }
 

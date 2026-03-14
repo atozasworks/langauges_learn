@@ -12,6 +12,8 @@ const PORT = Number(process.env.PORT || 3000);
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
 const MONGODB_DB = process.env.MONGODB_DB || process.env.MONGODB_DATABASE || "lldb";
 const NODE_ENV = process.env.NODE_ENV || "development";
+const OTP_LENGTH = Number(process.env.OTP_LENGTH || 6);
+const OTP_TTL_SECONDS = Number(process.env.OTP_TTL_SECONDS || 300);
 
 const app = express();
 app.use(cors());
@@ -20,6 +22,7 @@ app.use(express.json({ limit: "1mb" }));
 let mongoClient = null;
 let dbInstance = null;
 let smtpTransporter = null;
+let smtpVerified = false;
 let otpSchemaMigrated = false;
 
 function isEmailValid(email) {
@@ -146,25 +149,48 @@ function getSmtpTransporter() {
     return smtpTransporter;
   }
 
-  const host = process.env.SMTP_SERVER;
+  const service = process.env.SMTP_SERVICE || "";
+  const host = process.env.SMTP_SERVER || process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 465);
-  const secure = String(process.env.SMTP_SECURE || "true").toLowerCase() === "true";
-  const user = process.env.SMTP_EMAIL;
-  const pass = process.env.SMTP_PASSWORD;
+  const secure = String(process.env.SMTP_SECURE || (port === 465 ? "true" : "false")).toLowerCase() === "true";
+  const user = process.env.SMTP_EMAIL || process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_APP_PASSWORD;
+  const requireTLS = String(process.env.SMTP_REQUIRE_TLS || "false").toLowerCase() === "true";
+  const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || "true").toLowerCase() === "true";
 
-  if (!host || !user || !pass) {
+  if ((!service && !host) || !user || !pass) {
     return null;
   }
 
-  smtpTransporter = nodemailer.createTransport({
-    host,
-    port,
-    secure,
+  const smtpConfig = {
     auth: {
       user,
       pass,
     },
-  });
+    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 15000),
+    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 10000),
+    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20000),
+    requireTLS,
+    tls: {
+      servername: host || undefined,
+      rejectUnauthorized,
+    },
+  };
+
+  if (service) {
+    smtpTransporter = nodemailer.createTransport({
+      service,
+      secure,
+      ...smtpConfig,
+    });
+  } else {
+    smtpTransporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      ...smtpConfig,
+    });
+  }
 
   return smtpTransporter;
 }
@@ -175,18 +201,52 @@ async function sendOtpEmail(email, otp) {
     return { delivered: false, reason: "SMTP is not configured" };
   }
 
-  const fromName = process.env.SMTP_NAME || "LAN Learn";
-  const fromAddress = process.env.SMTP_EMAIL;
+  if (!smtpVerified) {
+    await transporter.verify();
+    smtpVerified = true;
+  }
 
-  await transporter.sendMail({
+  const fromName = process.env.SMTP_NAME || "LAN Learn";
+  const fromAddress = process.env.SMTP_FROM || process.env.SMTP_EMAIL;
+
+  const info = await transporter.sendMail({
     from: `"${fromName}" <${fromAddress}>`,
     to: email,
-    subject: "Your LAN Learn OTP Code",
-    text: `Your OTP is ${otp}. It expires in 5 minutes.`,
-    html: `<p>Your OTP is <strong>${otp}</strong>.</p><p>This OTP expires in 5 minutes.</p>`,
+    envelope: {
+      from: fromAddress,
+      to: email,
+    },
+    subject: "Login OTP",
+    text: `Your OTP for login is: ${otp}`,
+    html: `<p>Your OTP for login is: <strong>${otp}</strong></p>`,
   });
 
-  return { delivered: true };
+  const accepted = Array.isArray(info.accepted) ? info.accepted : [];
+  const rejected = Array.isArray(info.rejected) ? info.rejected : [];
+  const pending = Array.isArray(info.pending) ? info.pending : [];
+  const delivered = accepted.length > 0 && rejected.length === 0;
+
+  if (delivered) {
+    console.log(
+      `[OTP EMAIL SENT] to=${email} messageId=${info.messageId || "n/a"} accepted=${accepted.join(",")}`
+    );
+  } else {
+    console.warn(
+      `[OTP EMAIL FAILED] to=${email} accepted=${accepted.join(",")} rejected=${rejected.join(",")} pending=${pending.join(",")} response=${
+        info.response || "n/a"
+      }`
+    );
+  }
+
+  return {
+    delivered,
+    reason: delivered ? null : "SMTP server did not accept recipient",
+    accepted,
+    rejected,
+    pending,
+    messageId: info.messageId || null,
+    response: info.response || null,
+  };
 }
 
 async function saveLoginAudit(req, rec) {
@@ -221,6 +281,17 @@ async function saveOtpCode(email, otp, ttlSeconds) {
     used_at: null,
     created_at: new Date(),
   });
+}
+
+async function invalidateOtpCode(email, otp) {
+  const db = await getDb();
+  const otpCol = db.collection("otp_codes");
+
+  await otpCol.findOneAndUpdate(
+    { email, otp, used_at: null },
+    { $set: { used_at: new Date() } },
+    { sort: { created_at: -1 }, returnDocument: "after" }
+  );
 }
 
 async function verifyOtpCode(email, otp) {
@@ -260,38 +331,100 @@ function localDebugPayload(req, err) {
   };
 }
 
+function isLocalRequest(req) {
+  const ip = getClientIp(req);
+  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+}
+
+function isSmtpDebugAllowed(req) {
+  return NODE_ENV !== "production" || isLocalRequest(req);
+}
+
+function getSmtpConfigSummary() {
+  const service = (process.env.SMTP_SERVICE || "").trim();
+  const host = (process.env.SMTP_SERVER || process.env.SMTP_HOST || "").trim();
+  const port = Number(process.env.SMTP_PORT || 465);
+  const secure = String(process.env.SMTP_SECURE || (port === 465 ? "true" : "false")).toLowerCase() === "true";
+  const user = (process.env.SMTP_EMAIL || process.env.SMTP_USER || "").trim();
+  const pass = process.env.SMTP_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_APP_PASSWORD || "";
+  const fromAddress = (process.env.SMTP_FROM || process.env.SMTP_EMAIL || process.env.SMTP_USER || "").trim();
+  const requireTLS = String(process.env.SMTP_REQUIRE_TLS || "false").toLowerCase() === "true";
+  const rejectUnauthorized = String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || "true").toLowerCase() === "true";
+
+  const missing = [];
+  if (!service && !host) {
+    missing.push("SMTP_SERVER or SMTP_HOST or SMTP_SERVICE");
+  }
+  if (!user) {
+    missing.push("SMTP_EMAIL or SMTP_USER");
+  }
+  if (!pass) {
+    missing.push("SMTP_PASSWORD or SMTP_PASS or SMTP_APP_PASSWORD");
+  }
+  if (!fromAddress) {
+    missing.push("SMTP_FROM or SMTP_EMAIL");
+  }
+
+  return {
+    configured: missing.length === 0,
+    service: service || null,
+    host: host || null,
+    port,
+    secure,
+    user: user || null,
+    fromAddress: fromAddress || null,
+    requireTLS,
+    rejectUnauthorized,
+    hasPassword: Boolean(pass),
+    missing,
+  };
+}
+
 app.options(/.*/, cors());
 
 app.post(["/api/send-otp", "/auth-backend/send-otp.php"], async (req, res) => {
   try {
-    const email = String(req.body?.email || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
     if (!isEmailValid(email)) {
       return res.status(400).json({ success: false, message: "Enter a valid email address." });
     }
 
-    const otp = crypto.randomInt(0, 10000).toString().padStart(4, "0");
-    await saveOtpCode(email, otp, 300);
+    const otp = crypto.randomInt(0, 10 ** OTP_LENGTH).toString().padStart(OTP_LENGTH, "0");
+    await saveOtpCode(email, otp, OTP_TTL_SECONDS);
 
     const mailResult = await sendOtpEmail(email, otp);
+    if (!mailResult.delivered) {
+      await invalidateOtpCode(email, otp);
+      return res.status(502).json({
+        success: false,
+        message: "OTP email delivery failed. Please check email address or SMTP setup.",
+        ...(NODE_ENV !== "production"
+          ? {
+              dev_otp: otp,
+              mail_debug: {
+                reason: mailResult.reason || "unknown",
+                accepted: mailResult.accepted || [],
+                rejected: mailResult.rejected || [],
+                pending: mailResult.pending || [],
+                response: mailResult.response || null,
+              },
+            }
+          : {}),
+      });
+    }
+
     const responsePayload = {
       success: true,
-      message: mailResult.delivered
-        ? "OTP sent successfully to your email."
-        : "OTP generated successfully. SMTP is not configured, check server logs.",
+      message: "OTP sent successfully to your email.",
     };
-
-    if (!mailResult.delivered && NODE_ENV !== "production") {
-      responsePayload.dev_otp = otp;
-      responsePayload.note = "Development mode only";
-      // Log OTP to simplify local testing when SMTP is not configured.
-      console.log(`[DEV OTP] ${email}: ${otp}`);
-    }
 
     return res.json(responsePayload);
   } catch (err) {
+    console.error("[OTP SEND ERROR]", err?.message || err);
     return res.status(500).json({
       success: false,
       message: "Failed to send OTP. Please try again.",
+      ...(NODE_ENV !== "production" ? { smtp_error: err?.message || "Unknown SMTP error" } : {}),
       ...localDebugPayload(req, err),
     });
   }
@@ -306,8 +439,9 @@ app.post(["/api/verify-otp", "/auth-backend/verify-otp.php"], async (req, res) =
       return res.status(400).json({ success: false, message: "Enter a valid email address." });
     }
 
-    if (!/^\d{4}$/.test(otp)) {
-      return res.status(400).json({ success: false, message: "OTP must be exactly 4 digits." });
+    const otpRegex = new RegExp(`^\\d{${OTP_LENGTH}}$`);
+    if (!otpRegex.test(otp)) {
+      return res.status(400).json({ success: false, message: `OTP must be exactly ${OTP_LENGTH} digits.` });
     }
 
     const verified = await verifyOtpCode(email, otp);
@@ -492,6 +626,138 @@ app.post(["/api/delete-learner", "/auth-backend/delete-learner.php"], async (req
     return res.status(500).json({
       success: false,
       message: "Server error.",
+      ...localDebugPayload(req, err),
+    });
+  }
+});
+
+app.get(["/api/smtp-health", "/auth-backend/smtp-health.php"], async (req, res) => {
+  if (!isSmtpDebugAllowed(req)) {
+    return res.status(403).json({ success: false, message: "SMTP health endpoint is disabled." });
+  }
+
+  const smtp = getSmtpConfigSummary();
+  if (!smtp.configured) {
+    return res.status(200).json({
+      success: false,
+      message: "SMTP is not fully configured.",
+      smtp,
+    });
+  }
+
+  try {
+    const transporter = getSmtpTransporter();
+    if (!transporter) {
+      return res.status(200).json({
+        success: false,
+        message: "SMTP transporter is not configured.",
+        smtp,
+      });
+    }
+
+    await transporter.verify();
+    smtpVerified = true;
+
+    return res.json({
+      success: true,
+      message: "SMTP verification successful.",
+      smtp,
+    });
+  } catch (err) {
+    smtpVerified = false;
+    return res.status(502).json({
+      success: false,
+      message: "SMTP verification failed.",
+      smtp,
+      ...(NODE_ENV !== "production" ? { smtp_error: err?.message || "Unknown SMTP error" } : {}),
+      ...localDebugPayload(req, err),
+    });
+  }
+});
+
+app.post(["/api/smtp-health", "/auth-backend/smtp-health.php"], async (req, res) => {
+  if (!isSmtpDebugAllowed(req)) {
+    return res.status(403).json({ success: false, message: "SMTP health endpoint is disabled." });
+  }
+
+  const testEmail = String(req.body?.email || "").trim().toLowerCase();
+  if (!isEmailValid(testEmail)) {
+    return res.status(400).json({ success: false, message: "Valid email is required for SMTP test." });
+  }
+
+  const smtp = getSmtpConfigSummary();
+  if (!smtp.configured) {
+    return res.status(200).json({
+      success: false,
+      message: "SMTP is not fully configured.",
+      smtp,
+    });
+  }
+
+  try {
+    const transporter = getSmtpTransporter();
+    if (!transporter) {
+      return res.status(200).json({
+        success: false,
+        message: "SMTP transporter is not configured.",
+        smtp,
+      });
+    }
+
+    await transporter.verify();
+    smtpVerified = true;
+
+    const info = await transporter.sendMail({
+      from: `"${process.env.SMTP_NAME || "LAN Learn"}" <${smtp.fromAddress}>`,
+      to: testEmail,
+      envelope: {
+        from: smtp.fromAddress,
+        to: testEmail,
+      },
+      subject: "SMTP Health Check",
+      text: `SMTP health check successful at ${new Date().toISOString()}`,
+      html: `<p>SMTP health check successful at <strong>${new Date().toISOString()}</strong></p>`,
+    });
+
+    const accepted = Array.isArray(info.accepted) ? info.accepted : [];
+    const rejected = Array.isArray(info.rejected) ? info.rejected : [];
+    const pending = Array.isArray(info.pending) ? info.pending : [];
+    const delivered = accepted.length > 0 && rejected.length === 0;
+
+    if (!delivered) {
+      return res.status(502).json({
+        success: false,
+        message: "SMTP test email was not accepted by server.",
+        smtp,
+        result: {
+          accepted,
+          rejected,
+          pending,
+          response: info.response || null,
+          messageId: info.messageId || null,
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "SMTP test email sent successfully.",
+      smtp,
+      result: {
+        accepted,
+        rejected,
+        pending,
+        response: info.response || null,
+        messageId: info.messageId || null,
+      },
+    });
+  } catch (err) {
+    smtpVerified = false;
+    return res.status(502).json({
+      success: false,
+      message: "SMTP test email failed.",
+      smtp,
+      ...(NODE_ENV !== "production" ? { smtp_error: err?.message || "Unknown SMTP error" } : {}),
       ...localDebugPayload(req, err),
     });
   }

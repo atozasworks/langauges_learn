@@ -497,12 +497,24 @@
               />
               <button id="sendOtpBtn" type="button" class="send-otp-btn">Send OTP</button>
 
-              <label class="field-label" for="otp1">Enter 4-digit OTP</label>
+              <label class="field-label" for="otp1">Enter 6-digit OTP</label>
               <div class="otp-row" aria-label="OTP digits">
                 <input class="otp-digit" id="otp1" type="text" inputmode="numeric" maxlength="1" />
                 <input class="otp-digit" id="otp2" type="text" inputmode="numeric" maxlength="1" />
                 <input class="otp-digit" id="otp3" type="text" inputmode="numeric" maxlength="1" />
                 <input class="otp-digit" id="otp4" type="text" inputmode="numeric" maxlength="1" />
+                <input class="otp-digit" id="otp5" type="text" inputmode="numeric" maxlength="1" />
+                <input class="otp-digit" id="otp6" type="text" inputmode="numeric" maxlength="1" />
+              </div>
+
+              <div id="smtpDebugPanel" class="smtp-debug-panel" hidden>
+                <p class="smtp-debug-title">SMTP Debug</p>
+                <div class="smtp-debug-actions">
+                  <button id="smtpHealthBtn" type="button" class="smtp-debug-btn">Check SMTP</button>
+                  <button id="smtpTestBtn" type="button" class="smtp-debug-btn smtp-debug-btn-ghost">Send Test Mail</button>
+                </div>
+                <p id="smtpDebugHint" class="smtp-debug-hint">Visible only on localhost / debug mode.</p>
+                <pre id="smtpDebugResult" class="smtp-debug-result" aria-live="polite"></pre>
               </div>
             </div>
           </div>
