@@ -6,7 +6,7 @@
     <title>GTongue Learn - Language Learning Platform</title>
     <!-- PWA Meta Tags -->
     <meta name="description" content="A standalone language learning application for learning new languages through dialogues" />
-    <meta name="theme-color" content="#10b981" />
+    <meta name="theme-color" content="#0b0f19" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="GTongue Learn" />
@@ -39,11 +39,11 @@
     <!-- Navigation -->
     <nav class="navbar">
       <div class="nav-brand">
-        <h2><span class="notranslate">Language Learn</span> </h2>
+        <h2><span class="brand-icon">🌐</span> <span class="notranslate">LinguaLearn</span></h2>
       </div>
       <div class="nav-links">
         <a href="#home" id="nav-home" class="nav-link active">Home</a>
-        <!-- <a href="#dialogue" id="nav-dialogue" class="nav-link">Dialogue</a> -->
+        <a href="#dialogue" id="nav-dashboard" class="nav-link">Dashboard</a>
         <a href="#about" id="nav-about" class="nav-link">About</a>
         <a href="#opensource" id="nav-opensource" class="nav-link">Open Source Rules</a>
         <a 
@@ -60,6 +60,10 @@
         <div id="nav-user-info" class="nav-user-info" style="display:none;">
           <span id="nav-user-name" class="nav-user-name"></span>
           <button id="nav-logout-btn" class="nav-link logout-btn" type="button">Logout</button>
+        </div>
+        <div class="nav-stats">
+          <span class="stat-badge completed-badge">0 completed</span>
+          <span class="stat-badge practices-badge">0 practices</span>
         </div>
         <div class="language-selector">
           <select id="language-select" class="language-dropdown notranslate">
@@ -104,11 +108,8 @@
                   <li><button type="button" class="variant-option" data-value="v1/index.html">Variant 1</button></li>
                   <li><button type="button" class="variant-option" data-value="v2/index.html">Variant 2</button></li>
                   <li><button type="button" class="variant-option" data-value="v3/index.html">Variant 3</button></li>
-                  <li><button type="button" class="variant-option" data-value="v4/index.html">Variant 4</button></li>
                   <li><button type="button" class="variant-option" data-value="v5/index.html">Variant 5</button></li>
-                  <li><button type="button" class="variant-option" data-value="v6/index.html">Variant 6</button></li>
                   <li><button type="button" class="variant-option" data-value="v7/index.html">Category Dialogue</button></li>
-                  <li><button type="button" class="variant-option" data-value="v8/index.html">Variant 8</button></li>
                 </ul>
 
                 <p id="variant-no-results" class="variant-no-results" hidden>No matching variants.</p>
@@ -557,7 +558,7 @@
           <div style="font-size: 3rem; margin-bottom: 0.5rem;">📱</div>
           <h3 style="margin: 0.5rem 0; color: #10b981; font-size: 1.5rem;">Install GTongue Learn</h3>
         </div>
-        <p id="pwa-install-message" style="margin: 1rem 0; color: #666;">
+        <p id="pwa-install-message" style="margin: 1rem 0; color: #94a3b8;">
           Install this app on your device for a better experience. You can use it offline and access it directly from your home screen!
         </p>
         <div class="popup-buttons">
