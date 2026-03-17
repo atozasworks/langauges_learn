@@ -2,9 +2,12 @@ const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const dotenv = require("dotenv");
 const nodemailer = require("nodemailer");
 const { MongoClient } = require("mongodb");
+const mongoose = require("mongoose");
+const { createAuthRouter, createRequireAuth } = require("atozas-auth-kit-express");
 
 dotenv.config({ path: path.join(__dirname, ".env") });
 
@@ -12,11 +15,28 @@ const PORT = Number(process.env.PORT || 3000);
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
 const MONGODB_DB = process.env.MONGODB_DB || process.env.MONGODB_DATABASE || "lldb";
 const NODE_ENV = process.env.NODE_ENV || "development";
+const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || "").trim();
+const JWT_SECRET = String(process.env.JWT_SECRET || (NODE_ENV === "production" ? "" : "dev-jwt-secret-change-me"));
+const JWT_REFRESH_SECRET = String(
+  process.env.JWT_REFRESH_SECRET || (NODE_ENV === "production" ? "" : "dev-jwt-refresh-secret-change-me")
+);
+const FRONTEND_URL = String(process.env.FRONTEND_URL || "").trim();
 const OTP_LENGTH = Number(process.env.OTP_LENGTH || 6);
 const OTP_TTL_SECONDS = Number(process.env.OTP_TTL_SECONDS || 300);
 
 const app = express();
-app.use(cors());
+
+const allowedOrigins = FRONTEND_URL
+  ? FRONTEND_URL.split(",").map((origin) => origin.trim()).filter(Boolean)
+  : true;
+
+const corsOptions = {
+  origin: allowedOrigins,
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(express.json({ limit: "1mb" }));
 
 let mongoClient = null;
@@ -63,6 +83,78 @@ async function getDb() {
   await ensureIndexes(dbInstance);
   await ensureOtpSchema(dbInstance);
   return dbInstance;
+}
+
+async function ensureMongooseConnection() {
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+
+  await mongoose.connect(MONGODB_URI, {
+    dbName: MONGODB_DB,
+  });
+}
+
+function assertAuthConfiguration() {
+  const missing = [];
+
+  if (!JWT_SECRET) {
+    missing.push("JWT_SECRET");
+  }
+
+  if (!JWT_REFRESH_SECRET) {
+    missing.push("JWT_REFRESH_SECRET");
+  }
+
+  if (NODE_ENV === "production" && !GOOGLE_CLIENT_ID) {
+    missing.push("GOOGLE_CLIENT_ID");
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`Missing auth configuration: ${missing.join(", ")}`);
+  }
+
+  if (!GOOGLE_CLIENT_ID) {
+    console.warn("[AUTH CONFIG] GOOGLE_CLIENT_ID is not set. Google login will be unavailable.");
+  }
+
+  if (JWT_SECRET === "dev-jwt-secret-change-me" || JWT_REFRESH_SECRET === "dev-jwt-refresh-secret-change-me") {
+    console.warn("[AUTH CONFIG] Using development JWT secrets. Set JWT_SECRET and JWT_REFRESH_SECRET in .env.");
+  }
+}
+
+function createAuthKitConfig() {
+  return {
+    googleClientId: GOOGLE_CLIENT_ID || "missing-google-client-id",
+    jwtSecret: JWT_SECRET,
+    jwtRefreshSecret: JWT_REFRESH_SECRET,
+    accessTokenExpiry: process.env.ACCESS_TOKEN_EXPIRY || "15m",
+    refreshTokenExpiry: process.env.REFRESH_TOKEN_EXPIRY || "30d",
+    otpExpiry: Math.max(1, Math.ceil(OTP_TTL_SECONDS / 60)),
+    otpLength: OTP_LENGTH,
+    otpRateLimit: {
+      maxAttempts: Number(process.env.OTP_RATE_LIMIT_ATTEMPTS || 3),
+      windowMs: Number(process.env.OTP_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+    },
+    cookieOptions: {
+      httpOnly: true,
+      secure: NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    },
+    frontendUrl: FRONTEND_URL || undefined,
+    sendEmailOtp: async (to, otp) => {
+      const mailResult = await sendOtpEmail(to, otp);
+      if (!mailResult.delivered) {
+        if (NODE_ENV !== "production" && mailResult.reason === "SMTP is not configured") {
+          console.warn(`[DEV OTP] email=${to} otp=${otp}`);
+          return;
+        }
+
+        throw new Error(mailResult.reason || "Failed to deliver OTP email");
+      }
+    },
+  };
 }
 
 async function ensureOtpSchema(db) {
@@ -380,7 +472,21 @@ function getSmtpConfigSummary() {
   };
 }
 
-app.options(/.*/, cors());
+const authKitConfig = createAuthKitConfig();
+const requireAuth = createRequireAuth(authKitConfig);
+
+app.options(/.*/, cors(corsOptions));
+
+app.get("/api/auth/config", (req, res) => {
+  return res.json({
+    success: true,
+    apiUrl: "/api/auth",
+    googleClientId: GOOGLE_CLIENT_ID || null,
+    googleEnabled: Boolean(GOOGLE_CLIENT_ID),
+  });
+});
+
+app.use("/api/auth", createAuthRouter(authKitConfig));
 
 app.post(["/api/send-otp", "/auth-backend/send-otp.php"], async (req, res) => {
   try {
@@ -513,6 +619,119 @@ app.post(["/api/save-google-login", "/auth-backend/save-google-login.php"], asyn
     return res.status(500).json({
       success: false,
       message: "Google login failed.",
+      ...localDebugPayload(req, err),
+    });
+  }
+});
+
+app.get("/api/secure/learners", requireAuth, async (req, res) => {
+  try {
+    const email = String(req.user?.email || "").trim().toLowerCase();
+    if (!isEmailValid(email)) {
+      return res.status(401).json({ success: false, message: "Invalid authenticated user." });
+    }
+
+    const db = await getDb();
+    const docs = await db
+      .collection("learning_team")
+      .find({ user_email: email })
+      .sort({ created_at: 1, id: 1 })
+      .toArray();
+
+    const learners = docs.map((doc) => ({
+      id: Number(doc.id),
+      name: doc.learner_name,
+    }));
+
+    return res.json({ success: true, learners });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error.",
+      ...localDebugPayload(req, err),
+    });
+  }
+});
+
+app.post("/api/secure/learners", requireAuth, async (req, res) => {
+  try {
+    const email = String(req.user?.email || "").trim().toLowerCase();
+    const name = String(req.body?.name || "").trim();
+
+    if (!isEmailValid(email)) {
+      return res.status(401).json({ success: false, message: "Invalid authenticated user." });
+    }
+
+    if (!name || name.length < 2) {
+      return res.status(400).json({ success: false, message: "Learner name must be at least 2 characters." });
+    }
+
+    const formattedName = toTitleCase(name);
+    const db = await getDb();
+    const newId = await getNextCounterValue("learning_team_id");
+
+    await db.collection("learning_team").insertOne({
+      id: newId,
+      user_email: email,
+      learner_name: formattedName,
+      created_at: new Date(),
+    });
+
+    return res.json({
+      success: true,
+      message: `${formattedName} added to your learning team.`,
+      learner: {
+        id: newId,
+        name: formattedName,
+      },
+    });
+  } catch (err) {
+    if (err && err.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "This learner already exists in your team.",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error.",
+      ...localDebugPayload(req, err),
+    });
+  }
+});
+
+app.delete("/api/secure/learners/:learnerId", requireAuth, async (req, res) => {
+  try {
+    const email = String(req.user?.email || "").trim().toLowerCase();
+    const learnerId = Number(req.params?.learnerId || 0);
+
+    if (!isEmailValid(email)) {
+      return res.status(401).json({ success: false, message: "Invalid authenticated user." });
+    }
+
+    if (!Number.isInteger(learnerId) || learnerId <= 0) {
+      return res.status(400).json({ success: false, message: "Valid learner_id is required." });
+    }
+
+    const db = await getDb();
+    const result = await db.collection("learning_team").deleteOne({
+      id: learnerId,
+      user_email: email,
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Learner not found or does not belong to you.",
+      });
+    }
+
+    return res.json({ success: true, message: "Learner removed from your team." });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error.",
       ...localDebugPayload(req, err),
     });
   }
@@ -795,7 +1014,8 @@ app.get(/.*/, (req, res) => {
 
 async function start() {
   try {
-    await getDb();
+    assertAuthConfiguration();
+    await Promise.all([getDb(), ensureMongooseConnection()]);
     app.listen(PORT, () => {
       console.log(`LAN Learn Node server running at http://localhost:${PORT}`);
       console.log(`MongoDB database: ${MONGODB_DB}`);
@@ -810,6 +1030,11 @@ process.on("SIGINT", async () => {
   if (mongoClient) {
     await mongoClient.close();
   }
+
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.connection.close();
+  }
+
   process.exit(0);
 });
 

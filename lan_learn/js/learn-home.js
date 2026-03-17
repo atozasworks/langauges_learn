@@ -43,6 +43,38 @@ class LearnHome {
         } catch (_) {}
     }
 
+    getAccessToken() {
+        try {
+            return localStorage.getItem('accessToken') || '';
+        } catch (_) {
+            return '';
+        }
+    }
+
+    hasSecureSession() {
+        return Boolean(this.getAccessToken());
+    }
+
+    buildAuthHeaders(includeJson = true) {
+        const headers = {};
+        if (includeJson) {
+            headers['Content-Type'] = 'application/json';
+        }
+
+        const token = this.getAccessToken();
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+
+        return headers;
+    }
+
+    handleAuthFailure(message = 'Session expired. Please login again.') {
+        Utils.showToast(message, 'warning');
+        window.dispatchEvent(new CustomEvent('auth:session-expired'));
+        this.onUserLogout();
+    }
+
     async onUserLogin(detail) {
         this.loggedInUser = detail; // { name, email }
         this.hideLoginRequiredState();
@@ -227,11 +259,25 @@ class LearnHome {
         }
 
         try {
-            const res = await fetch('/api/add-learner', {
+            const secureMode = this.hasSecureSession();
+            const endpoint = secureMode ? '/api/secure/learners' : '/api/add-learner';
+
+            const body = secureMode
+                ? { name: formattedName }
+                : { email: this.loggedInUser.email, name: formattedName };
+
+            const res = await fetch(endpoint, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: this.loggedInUser.email, name: formattedName })
+                credentials: 'include',
+                headers: this.buildAuthHeaders(true),
+                body: JSON.stringify(body)
             });
+
+            if (res.status === 401 || res.status === 403) {
+                this.handleAuthFailure();
+                return;
+            }
+
             const data = await res.json();
 
             if (!res.ok || !data.success) {
@@ -272,11 +318,31 @@ class LearnHome {
         const id = this.pendingDeleteId;
 
         try {
-            const res = await fetch('/api/delete-learner', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: this.loggedInUser.email, learner_id: id })
-            });
+            const secureMode = this.hasSecureSession();
+            const endpoint = secureMode ? `/api/secure/learners/${id}` : '/api/delete-learner';
+
+            const requestConfig = secureMode
+                ? {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: this.buildAuthHeaders(false)
+                }
+                : {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: this.buildAuthHeaders(true),
+                    body: JSON.stringify({ email: this.loggedInUser.email, learner_id: id })
+                };
+
+            const res = await fetch(endpoint, requestConfig);
+
+            if (res.status === 401 || res.status === 403) {
+                Utils.hidePopup('delete-popup');
+                this.pendingDeleteId = null;
+                this.handleAuthFailure();
+                return;
+            }
+
             const data = await res.json();
 
             if (!res.ok || !data.success) {
@@ -445,8 +511,22 @@ class LearnHome {
         if (!this.loggedInUser) return;
 
         try {
-            const url = `/api/get-learners?email=${encodeURIComponent(this.loggedInUser.email)}`;
-            const res = await fetch(url);
+            const secureMode = this.hasSecureSession();
+            const url = secureMode
+                ? '/api/secure/learners'
+                : `/api/get-learners?email=${encodeURIComponent(this.loggedInUser.email)}`;
+
+            const res = await fetch(url, {
+                method: 'GET',
+                credentials: 'include',
+                headers: this.buildAuthHeaders(false)
+            });
+
+            if (res.status === 401 || res.status === 403) {
+                this.handleAuthFailure('Your login session expired. Please sign in again.');
+                return;
+            }
+
             const data = await res.json();
 
             if (res.ok && data.success) {

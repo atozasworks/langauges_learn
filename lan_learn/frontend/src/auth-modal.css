@@ -1,0 +1,193 @@
+.authkit-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.authkit-header h3 {
+  margin: 0;
+  color: #f9fafb;
+  font-size: 1.15rem;
+}
+
+.authkit-header p {
+  margin: 6px 0 0;
+  color: #9ca3af;
+  font-size: 0.88rem;
+}
+
+.authkit-divider {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  position: relative;
+}
+
+.authkit-divider::before,
+.authkit-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 38%;
+  height: 1px;
+  background: #2f3440;
+}
+
+.authkit-divider::before {
+  left: 0;
+}
+
+.authkit-divider::after {
+  right: 0;
+}
+
+.authkit-warning {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #7f1d1d;
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.3);
+  font-size: 0.82rem;
+}
+
+.authkit-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #166534;
+  color: #bbf7d0;
+  background: rgba(22, 101, 52, 0.3);
+  font-size: 0.82rem;
+}
+
+.authkit-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #991b1b;
+  color: #fecaca;
+  background: rgba(153, 27, 27, 0.25);
+  font-size: 0.82rem;
+}
+
+.authkit-loading {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  color: #d1d5db;
+  padding: 20px 0;
+}
+
+.authkit-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #22c55e;
+  animation: authkit-spin 0.8s linear infinite;
+}
+
+.authkit-error-block {
+  padding: 12px;
+  border: 1px solid #991b1b;
+  border-radius: 10px;
+  background: rgba(153, 27, 27, 0.28);
+  color: #fecaca;
+  font-size: 0.84rem;
+}
+
+.authkit-user-card {
+  border: 1px solid #2f3440;
+  border-radius: 12px;
+  background: #141922;
+  padding: 12px;
+}
+
+.authkit-user-name {
+  margin: 0;
+  color: #f9fafb;
+  font-weight: 600;
+}
+
+.authkit-user-email {
+  margin: 6px 0 0;
+  color: #9ca3af;
+  font-size: 0.84rem;
+}
+
+.authkit-signout-btn {
+  border: 1px solid #374151;
+  border-radius: 10px;
+  background: #1f2937;
+  color: #f9fafb;
+  padding: 11px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.authkit-signout-btn:hover {
+  background: #111827;
+}
+
+#react-auth-root .email-otp-login {
+  max-width: 100%;
+}
+
+#react-auth-root .auth-form {
+  gap: 12px;
+}
+
+#react-auth-root .form-label {
+  color: #d1d5db;
+}
+
+#react-auth-root .form-hint {
+  color: #9ca3af;
+}
+
+#react-auth-root .form-input {
+  border: 1px solid #374151;
+  background: #111827;
+  color: #f9fafb;
+}
+
+#react-auth-root .form-input:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+#react-auth-root .auth-button {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+#react-auth-root .auth-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+#react-auth-root .auth-button-secondary {
+  color: #d1d5db;
+  border: 1px solid #374151;
+}
+
+#react-auth-root .auth-button-secondary:hover:not(:disabled) {
+  background: #1f2937;
+}
+
+#react-auth-root .auth-error {
+  color: #fecaca;
+  background: rgba(153, 27, 27, 0.25);
+  border: 1px solid #991b1b;
+}
+
+#react-auth-root .auth-success {
+  color: #bbf7d0;
+  background: rgba(22, 101, 52, 0.3);
+  border: 1px solid #166534;
+}
+
+@keyframes authkit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

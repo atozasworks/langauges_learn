@@ -1,536 +1,154 @@
 (() => {
-  const loginForm = document.getElementById("loginForm");
-  const loginNameInput = document.getElementById("loginName");
-  const googleOption = document.getElementById("googleOption");
-  const otpEmail = document.getElementById("otpEmail");
-  const sendOtpBtn = document.getElementById("sendOtpBtn");
-  const smtpDebugPanel = document.getElementById("smtpDebugPanel");
-  const smtpHealthBtn = document.getElementById("smtpHealthBtn");
-  const smtpTestBtn = document.getElementById("smtpTestBtn");
-  const smtpDebugHint = document.getElementById("smtpDebugHint");
-  const smtpDebugResult = document.getElementById("smtpDebugResult");
-  const otpDigits = Array.from(document.querySelectorAll(".otp-digit"));
-  const modeHint = document.getElementById("modeHint");
-  const formError = document.getElementById("formError");
-  const formSuccess = document.getElementById("formSuccess");
   const modal = document.getElementById("loginModal");
-  const closeButton = document.querySelector(".modal-close");
+  const closeButton = document.querySelector("#loginModal .modal-close");
 
-  // Navbar elements
   const navLoginBtn = document.getElementById("nav-login");
   const navUserInfo = document.getElementById("nav-user-info");
   const navUserName = document.getElementById("nav-user-name");
   const navLogoutBtn = document.getElementById("nav-logout-btn");
 
-  if (!loginForm || !googleOption || !otpEmail || otpDigits.length === 0 || !modeHint || !formError || !formSuccess || !modal) {
+  const logoutYesBtn = document.getElementById("logout-yes-btn");
+  const logoutNoBtn = document.getElementById("logout-no-btn");
+
+  if (!modal || !navLoginBtn || !navUserInfo || !navUserName || !navLogoutBtn) {
     return;
   }
 
-  let loginMode = null;
-  let googleTokenClient = null;
-  let googleProfile = null;
-  let otpRequestedForEmail = "";
-
-  const isLocalHost =
-    window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1" ||
-    window.location.hostname === "::1";
-  const forceSmtpDebug = new URLSearchParams(window.location.search).get("smtpDebug") === "1";
-  const canShowSmtpDebug = isLocalHost || forceSmtpDebug;
-
-  const googleClientId =
-    googleOption.getAttribute("data-client-id") ||
-    "444024521791-26vj3nj553l540pjhofsgnk9tv2du5gh.apps.googleusercontent.com";
-
-  // ─── Check if user is already logged in (sessionStorage) ───
-  const savedUser = sessionStorage.getItem("loggedInUser");
-  if (savedUser) {
+  function readLoggedInUser() {
     try {
-      const user = JSON.parse(savedUser);
-      showLoggedInState(user.name, user.email);
-    } catch (_) {}
-  }
-
-  // ─── OTP digit input handling ───
-  otpDigits.forEach((digit, index) => {
-    digit.addEventListener("input", () => {
-      digit.value = digit.value.replace(/\D/g, "").slice(0, 1);
-      if (digit.value && index < otpDigits.length - 1) {
-        otpDigits[index + 1].focus();
+      const raw = sessionStorage.getItem("loggedInUser");
+      if (!raw) {
+        return null;
       }
-    });
 
-    digit.addEventListener("keydown", (event) => {
-      if (event.key === "Backspace" && !digit.value && index > 0) {
-        otpDigits[index - 1].focus();
+      const user = JSON.parse(raw);
+      if (!user || !user.email) {
+        return null;
       }
-    });
 
-    digit.addEventListener("focus", () => setLoginMode("otp"));
-  });
-
-  otpEmail.addEventListener("focus", () => setLoginMode("otp"));
-  otpEmail.addEventListener("input", () => {
-    otpRequestedForEmail = "";
-  });
-
-  setupSmtpDebugPanel();
-
-  function setupSmtpDebugPanel() {
-    if (!smtpDebugPanel || !smtpHealthBtn || !smtpTestBtn || !smtpDebugResult) {
-      return;
-    }
-
-    if (!canShowSmtpDebug) {
-      smtpDebugPanel.hidden = true;
-      return;
-    }
-
-    smtpDebugPanel.hidden = false;
-
-    smtpHealthBtn.addEventListener("click", async () => {
-      await runSmtpDebugRequest("check");
-    });
-
-    smtpTestBtn.addEventListener("click", async () => {
-      await runSmtpDebugRequest("test");
-    });
-  }
-
-  function renderSmtpDebugResult(title, payload, isError = false) {
-    if (!smtpDebugResult) {
-      return;
-    }
-
-    const formatted = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
-    smtpDebugResult.textContent = `${title}\n${formatted}`;
-    smtpDebugResult.classList.add("show");
-    smtpDebugResult.style.color = isError ? "#ffb4b4" : "#c8f5da";
-  }
-
-  function setSmtpDebugBusy(isBusy) {
-    if (!smtpHealthBtn || !smtpTestBtn) {
-      return;
-    }
-
-    smtpHealthBtn.disabled = isBusy;
-    smtpTestBtn.disabled = isBusy;
-
-    if (smtpDebugHint) {
-      smtpDebugHint.textContent = isBusy
-        ? "Checking SMTP..."
-        : "Visible only on localhost / debug mode.";
+      return user;
+    } catch (_) {
+      return null;
     }
   }
 
-  async function runSmtpDebugRequest(mode) {
-    const endpoint = "/api/smtp-health";
-    setSmtpDebugBusy(true);
-
-    try {
-      let response;
-
-      if (mode === "check") {
-        response = await fetch(endpoint, { method: "GET" });
-      } else {
-        const email = otpEmail.value.trim();
-        if (!email) {
-          renderSmtpDebugResult("SMTP Test Failed", "Enter email first to send test mail.", true);
-          return;
-        }
-
-        response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email })
-        });
-      }
-
-      const payload = await response.json().catch(() => ({ success: false, message: "Non-JSON response" }));
-
-      if (!response.ok || !payload.success) {
-        renderSmtpDebugResult(
-          mode === "check" ? "SMTP Check Failed" : "SMTP Test Failed",
-          payload,
-          true
-        );
-        return;
-      }
-
-      renderSmtpDebugResult(
-        mode === "check" ? "SMTP Check OK" : "SMTP Test Mail Sent",
-        payload
-      );
-    } catch (error) {
-      renderSmtpDebugResult(
-        mode === "check" ? "SMTP Check Error" : "SMTP Test Error",
-        error?.message || "Unexpected error",
-        true
-      );
-    } finally {
-      setSmtpDebugBusy(false);
-    }
+  function showLoggedInState(user) {
+    navLoginBtn.style.display = "none";
+    navUserInfo.style.display = "flex";
+    navUserName.textContent = user.name || user.email || "User";
   }
 
-  // ─── Google button click ───
-  googleOption.addEventListener("click", async () => {
-    setLoginMode("google");
-    // Disable name field — Google provides the name automatically
-    if (loginNameInput) {
-      loginNameInput.disabled = true;
-      loginNameInput.value = "";
-      loginNameInput.placeholder = "Name will be fetched from Google";
-    }
-    await startGooglePopupLogin();
-  });
+  function showLoggedOutState() {
+    navLoginBtn.style.display = "";
+    navUserInfo.style.display = "none";
+    navUserName.textContent = "";
+  }
 
-  // ─── Send OTP button ───
-  sendOtpBtn?.addEventListener("click", async () => {
-    setLoginMode("otp");
-    formError.textContent = "";
-    formSuccess.textContent = "";
-
-    const email = otpEmail.value.trim();
-    if (!email) {
-      formError.textContent = "Enter your Gmail before requesting OTP.";
+  function syncNavbarFromSession() {
+    const user = readLoggedInUser();
+    if (user) {
+      showLoggedInState(user);
       return;
     }
 
-    const name = loginNameInput ? loginNameInput.value.trim() : "";
-    if (!name) {
-      formError.textContent = "Enter your name before requesting OTP.";
-      loginNameInput?.focus();
-      return;
-    }
+    showLoggedOutState();
+  }
 
-    sendOtpBtn.disabled = true;
-    sendOtpBtn.textContent = "Sending...";
+  function openModal() {
+    modal.classList.add("show");
+    document.body.classList.add("modal-open");
+  }
 
-    try {
-      const response = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok || !payload.success) {
-        formError.textContent = payload.message || "Failed to send OTP.";
-        return;
-      }
-
-      otpRequestedForEmail = email;
-      formSuccess.textContent = payload.message || "OTP sent successfully.";
-    } catch (error) {
-      formError.textContent = "Server error while sending OTP.";
-    } finally {
-      sendOtpBtn.disabled = false;
-      sendOtpBtn.textContent = "Send OTP";
-    }
-  });
-
-  // ─── Close modal helpers ───
   function closeModal() {
     modal.classList.remove("show");
     document.body.classList.remove("modal-open");
   }
 
+  function requestLogout() {
+    navLogoutBtn.disabled = true;
+    window.dispatchEvent(new CustomEvent("auth:logout-request"));
+  }
+
+  navLoginBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    openModal();
+  });
+
   closeButton?.addEventListener("click", closeModal);
 
   modal.addEventListener("click", (event) => {
-    if (event.target === modal) closeModal();
+    if (event.target === modal) {
+      closeModal();
+    }
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.classList.contains("show")) closeModal();
+    if (event.key === "Escape" && modal.classList.contains("show")) {
+      closeModal();
+    }
   });
 
-  // ─── Logout button — show confirmation popup ───
-  const logoutYesBtn = document.getElementById("logout-yes-btn");
-  const logoutNoBtn = document.getElementById("logout-no-btn");
+  navLogoutBtn.addEventListener("click", () => {
+    if (typeof Utils !== "undefined" && Utils.showPopup) {
+      Utils.showPopup("logout-popup");
+      return;
+    }
 
-  navLogoutBtn?.addEventListener("click", () => {
-    Utils.showPopup('logout-popup');
+    requestLogout();
   });
 
   logoutYesBtn?.addEventListener("click", () => {
-    Utils.hidePopup('logout-popup');
-    sessionStorage.removeItem("loggedInUser");
-    showLoggedOutState();
-    // Notify other modules (e.g. LearnHome) about logout
-    window.dispatchEvent(new CustomEvent('userLogout'));
+    if (typeof Utils !== "undefined" && Utils.hidePopup) {
+      Utils.hidePopup("logout-popup");
+    }
+
+    requestLogout();
   });
 
   logoutNoBtn?.addEventListener("click", () => {
-    Utils.hidePopup('logout-popup');
-  });
-
-  // ─── Show logged-in state in navbar ───
-  function showLoggedInState(name, email) {
-    if (navLoginBtn) navLoginBtn.style.display = "none";
-    if (navUserInfo) {
-      navUserInfo.style.display = "flex";
-      navUserName.textContent = name || email || "User";
-    }
-  }
-
-  // ─── Show logged-out state in navbar ───
-  function showLoggedOutState() {
-    if (navLoginBtn) navLoginBtn.style.display = "";
-    if (navUserInfo) navUserInfo.style.display = "none";
-    if (navUserName) navUserName.textContent = "";
-    // Reset form
-    loginMode = null;
-    googleProfile = null;
-    otpRequestedForEmail = "";
-    loginForm.reset();
-    if (loginNameInput) {
-      loginNameInput.disabled = false;
-      loginNameInput.placeholder = "Enter your name";
-    }
-    setLoginMode(null);
-  }
-
-  // ─── Handle successful login ───
-  function onLoginSuccess(name, email) {
-    const userData = { name, email };
-    sessionStorage.setItem("loggedInUser", JSON.stringify(userData));
-    showLoggedInState(name, email);
-
-    // Notify other modules (e.g. LearnHome) about login
-    window.dispatchEvent(new CustomEvent('userLogin', { detail: { name, email } }));
-
-    // Show success briefly, then close modal
-    formSuccess.textContent = `Welcome, ${name}!`;
-    setTimeout(() => {
-      closeModal();
-      // Reset form for next time
-      formError.textContent = "";
-      formSuccess.textContent = "";
-    }, 1200);
-  }
-
-  // ─── Mode toggle ───
-  function setLoginMode(mode) {
-    loginMode = mode;
-    formError.textContent = "";
-    formSuccess.textContent = "";
-
-    if (mode === "google") {
-      loginForm.classList.remove("mode-otp");
-      loginForm.classList.add("mode-google");
-      googleOption.setAttribute("aria-pressed", "true");
-      googleOption.setAttribute("aria-disabled", "false");
-
-      otpEmail.disabled = true;
-      otpDigits.forEach((digit) => {
-        digit.disabled = true;
-        digit.value = "";
-      });
-
-      otpEmail.value = "";
-      otpRequestedForEmail = "";
-      // Disable name for Google — auto-fetched
-      if (loginNameInput) {
-        loginNameInput.disabled = true;
-        loginNameInput.value = "";
-        loginNameInput.placeholder = "Name will be fetched from Google";
-      }
-      modeHint.textContent = "Google login selected. OTP fields are disabled.";
-      return;
-    }
-
-    if (mode === "otp") {
-      loginForm.classList.remove("mode-google");
-      loginForm.classList.add("mode-otp");
-      googleOption.setAttribute("aria-pressed", "false");
-      googleOption.setAttribute("aria-disabled", "true");
-
-      otpEmail.disabled = false;
-      otpDigits.forEach((digit) => {
-        digit.disabled = false;
-      });
-
-      // Enable name for OTP — user must type it
-      if (loginNameInput) {
-        loginNameInput.disabled = false;
-        loginNameInput.placeholder = "Enter your name";
-      }
-      modeHint.textContent = "OTP login selected. Google option is inactive.";
-      return;
-    }
-
-    // Reset
-    loginForm.classList.remove("mode-google", "mode-otp");
-    googleOption.setAttribute("aria-pressed", "false");
-    googleOption.setAttribute("aria-disabled", "false");
-    otpEmail.disabled = false;
-    otpDigits.forEach((digit) => {
-      digit.disabled = false;
-    });
-    if (loginNameInput) {
-      loginNameInput.disabled = false;
-      loginNameInput.placeholder = "Enter your name";
-    }
-    modeHint.textContent = "Select one login method to continue.";
-  }
-
-  // ─── Google OAuth ───
-  function ensureGoogleTokenClient() {
-    if (googleTokenClient) return googleTokenClient;
-    if (!window.google?.accounts?.oauth2) return null;
-
-    googleTokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: googleClientId,
-      scope: "openid email profile",
-      callback: () => {}
-    });
-
-    return googleTokenClient;
-  }
-
-  async function fetchGoogleUserProfile(accessToken) {
-    const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (!response.ok) throw new Error("Failed to fetch Google account profile.");
-    return response.json();
-  }
-
-  async function saveGoogleLoginToDatabase(accessToken) {
-    try {
-      const response = await fetch("/api/save-google-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken })
-      });
-      // Try to read response as text first for debugging
-      const responseText = await response.text();
-      console.log("save-google-login response:", response.status, responseText);
-      
-      let payload;
-      try {
-        payload = JSON.parse(responseText);
-      } catch (parseErr) {
-        console.warn("Server returned non-JSON:", responseText);
-        return { success: true, message: "DB save skipped — server error." };
-      }
-      
-      if (!response.ok || !payload.success) {
-        console.warn("DB save issue:", payload.message || response.status);
-      }
-      return payload;
-    } catch (err) {
-      // PHP backend not available (e.g. Live Server) — skip DB save silently
-      console.warn("DB save skipped (no PHP backend):", err.message);
-      return { success: true, message: "DB save skipped — no backend." };
-    }
-  }
-
-  async function startGooglePopupLogin() {
-    formError.textContent = "";
-    formSuccess.textContent = "";
-
-    const tokenClient = ensureGoogleTokenClient();
-    if (!tokenClient) {
-      formError.textContent = "Google login not ready. Refresh and try again.";
-      return;
-    }
-
-    googleOption.disabled = true;
-    formSuccess.textContent = "Opening Google account popup...";
-
-    try {
-      const tokenResponse = await new Promise((resolve, reject) => {
-        tokenClient.callback = (response) => {
-          if (response.error) {
-            reject(new Error(response.error));
-            return;
-          }
-          resolve(response);
-        };
-        tokenClient.requestAccessToken({ prompt: "consent" });
-      });
-
-      const profile = await fetchGoogleUserProfile(tokenResponse.access_token);
-      // Try to save to DB but don't block login if it fails
-      saveGoogleLoginToDatabase(tokenResponse.access_token);
-      googleProfile = profile;
-
-      // Auto-fetch name from Google profile
-      const displayName = profile.name || profile.email;
-      if (loginNameInput) {
-        loginNameInput.value = displayName;
-      }
-      onLoginSuccess(displayName, profile.email);
-    } catch (error) {
-      formError.textContent = "Google login failed. Please try again.";
-    } finally {
-      googleOption.disabled = false;
-    }
-  }
-
-  // ─── Form submit (OTP verify) ───
-  loginForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    formError.textContent = "";
-    formSuccess.textContent = "";
-
-    if (!loginMode) {
-      formError.textContent = "Please select Google or OTP login before continuing.";
-      return;
-    }
-
-    if (loginMode === "google") {
-      if (googleProfile?.email) {
-        const displayName = googleProfile.name || googleProfile.email;
-        onLoginSuccess(displayName, googleProfile.email);
-        return;
-      }
-      await startGooglePopupLogin();
-      return;
-    }
-
-    // OTP mode — name is required
-    const name = loginNameInput ? loginNameInput.value.trim() : "";
-    if (!name) {
-      formError.textContent = "Please enter your name.";
-      loginNameInput?.focus();
-      return;
-    }
-
-    const otp = otpDigits.map((digit) => digit.value.trim()).join("");
-    const email = otpEmail.value.trim();
-
-    if (!email || otp.length !== 6) {
-      formError.textContent = "Enter your Gmail and complete all 6 OTP digits.";
-      return;
-    }
-
-    if (otpRequestedForEmail !== email) {
-      formError.textContent = "Please click Send OTP for this email first.";
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp })
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok || !payload.success) {
-        formError.textContent = payload.message || "OTP verification failed.";
-        return;
-      }
-
-      // OTP verified — login success
-      onLoginSuccess(name, email);
-    } catch (error) {
-      formError.textContent = "Server error while verifying OTP. Please try again.";
+    if (typeof Utils !== "undefined" && Utils.hidePopup) {
+      Utils.hidePopup("logout-popup");
     }
   });
+
+  window.addEventListener("auth:logout-complete", () => {
+    navLogoutBtn.disabled = false;
+    sessionStorage.removeItem("loggedInUser");
+    showLoggedOutState();
+    closeModal();
+    window.dispatchEvent(new CustomEvent("userLogout"));
+  });
+
+  window.addEventListener("auth:session-expired", () => {
+    sessionStorage.removeItem("loggedInUser");
+    showLoggedOutState();
+    window.dispatchEvent(new CustomEvent("auth:logout-request"));
+    window.dispatchEvent(new CustomEvent("userLogout"));
+  });
+
+  window.addEventListener("auth:login-success", closeModal);
+
+  window.addEventListener("userLogin", (event) => {
+    const detail = event.detail || {};
+
+    if (detail.email) {
+      sessionStorage.setItem(
+        "loggedInUser",
+        JSON.stringify({
+          name: detail.name || detail.email,
+          email: detail.email,
+          provider: detail.provider || "email",
+        })
+      );
+    }
+
+    syncNavbarFromSession();
+  });
+
+  window.addEventListener("userLogout", () => {
+    sessionStorage.removeItem("loggedInUser");
+    showLoggedOutState();
+  });
+
+  syncNavbarFromSession();
 })();

@@ -4,8 +4,13 @@
   "description": "A standalone language learning application extracted from GTongue project",
   "main": "server.js",
   "scripts": {
+    "prestart": "npm run build:auth-ui",
     "start": "node server.js",
+    "predev": "npm run build:auth-ui",
     "dev": "node --watch server.js",
+    "prepare:auth-kits": "node scripts/prepare-auth-kits.mjs",
+    "build:auth-ui": "npm run prepare:auth-kits && npx esbuild frontend/src/auth-modal-entry.jsx --bundle --format=iife --global-name=LanLearnAuthModal --outfile=frontend/dist/auth-modal.js --loader:.css=css --define:process.env.NODE_ENV=\"production\"",
+    "postinstall": "node scripts/prepare-auth-kits.mjs",
     "serve-static": "npx http-server . -p 3000 -o",
     "lint": "echo 'No linting configured for standalone HTML/CSS/JS project'"
   },
@@ -31,14 +36,20 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "atozas-auth-kit-express": "^1.0.0",
+    "atozas-react-auth-kit": "^1.0.1",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
-    "express": "^5.1.0",
+    "express": "^5.2.1",
     "mongodb": "^6.20.0",
     "nodemailer": "^7.0.6"
   },
   "devDependencies": {
-    "http-server": "^14.1.1"
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.27.4",
+    "http-server": "^14.1.1",
+    "typescript": "^5.9.3"
   },
   "browserslist": [
     "> 1%",

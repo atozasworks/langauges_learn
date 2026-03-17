@@ -36,6 +36,8 @@ A standalone language learning application extracted from the GTongue project, b
 npm install
 ```
 
+This also runs `postinstall` to repair/build `atozas-auth-kit-express` and `atozas-react-auth-kit` if their `dist` output is missing.
+
 3. Create your environment file:
 
 ```bash
@@ -52,6 +54,7 @@ MONGODB_DB=lldb
 5. Start the full app (frontend + API) with Node:
 
 ```bash
+npm run build:auth-ui
 npm run dev
 ```
 
@@ -185,6 +188,20 @@ The application includes two translation approaches:
 
 - `MONGODB_URI`: MongoDB connection string (Compass-compatible)
 - `MONGODB_DB`: Database name
+- `JWT_SECRET`: JWT secret for access tokens
+- `JWT_REFRESH_SECRET`: JWT secret for refresh tokens
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID (required in production)
+
+### Auth Architecture
+
+- Backend auth is powered by `atozas-auth-kit-express` mounted at `/api/auth`.
+- Frontend auth UI uses production-ready React components from `atozas-react-auth-kit` bundled into `frontend/dist/auth-modal.js`.
+- Access tokens are sent as Bearer tokens; refresh tokens are stored in HTTP-only cookies.
+- Secure learner CRUD endpoints are protected and use authenticated user identity:
+   - `GET /api/secure/learners`
+   - `POST /api/secure/learners`
+   - `DELETE /api/secure/learners/:learnerId`
+- Legacy endpoints (`/api/get-learners`, `/api/add-learner`, `/api/delete-learner`) remain for backward compatibility.
 
 ### Optional (OTP Email)
 

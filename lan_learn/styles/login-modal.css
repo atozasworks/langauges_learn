@@ -120,6 +120,10 @@ body.modal-open {
   padding: 20px 24px 24px;
 }
 
+#react-auth-root {
+  padding: 20px 24px 24px;
+}
+
 /* ── Divider ── */
 .login-divider {
   display: flex;
@@ -472,6 +476,10 @@ body.modal-open {
   }
 
   #loginForm {
+    padding: 16px 18px 20px;
+  }
+
+  #react-auth-root {
     padding: 16px 18px 20px;
   }
 
