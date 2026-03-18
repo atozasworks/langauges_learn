@@ -120,10 +120,22 @@ class LearnHome {
         const searchInput = document.getElementById('variant-search-input');
         const options = Array.from(document.querySelectorAll('.variant-option'));
         const noResults = document.getElementById('variant-no-results');
+        const hoverMessage = document.getElementById('variant-hover-message');
 
-        if (!dropdown || !toggleBtn || !menu || !searchInput || options.length === 0 || !noResults) {
+        if (!dropdown || !toggleBtn || !menu || !searchInput || options.length === 0 || !noResults || !hoverMessage) {
             return;
         }
+
+        const defaultHoverMessage = hoverMessage.textContent.trim();
+
+        const setHoverMessage = (option) => {
+            const message = option?.getAttribute('data-hover-message') || defaultHoverMessage;
+            hoverMessage.textContent = message;
+        };
+
+        const resetHoverMessage = () => {
+            hoverMessage.textContent = defaultHoverMessage;
+        };
 
         const openMenu = () => {
             dropdown.classList.add('is-open');
@@ -131,6 +143,7 @@ class LearnHome {
             menu.hidden = false;
             searchInput.value = '';
             this.filterVariantOptions('', options, noResults);
+            resetHoverMessage();
             searchInput.focus();
         };
 
@@ -140,6 +153,7 @@ class LearnHome {
             menu.hidden = true;
             searchInput.value = '';
             this.filterVariantOptions('', options, noResults);
+            resetHoverMessage();
         };
 
         toggleBtn.addEventListener('click', () => {
@@ -152,9 +166,19 @@ class LearnHome {
 
         searchInput.addEventListener('input', () => {
             this.filterVariantOptions(searchInput.value, options, noResults);
+            resetHoverMessage();
+        });
+
+        searchInput.addEventListener('focus', () => {
+            resetHoverMessage();
         });
 
         options.forEach((option) => {
+            option.addEventListener('mouseenter', () => setHoverMessage(option));
+            option.addEventListener('focus', () => setHoverMessage(option));
+            option.addEventListener('mouseleave', () => resetHoverMessage());
+            option.addEventListener('blur', () => resetHoverMessage());
+
             option.addEventListener('click', () => {
                 options.forEach((btn) => btn.classList.remove('is-selected'));
                 option.classList.add('is-selected');

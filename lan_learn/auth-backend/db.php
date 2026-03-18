@@ -46,6 +46,51 @@ function parseEnvFile(string $path): array
 }
 
 /**
+ * Merge multiple potential .env sources, later files only filling missing keys.
+ */
+function loadDbEnv(): array
+{
+    $candidates = [
+        __DIR__ . '/../.env',
+        ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/.env',
+    ];
+
+    $merged = [];
+    foreach ($candidates as $path) {
+        if (!is_string($path) || $path === '') {
+            continue;
+        }
+
+        foreach (parseEnvFile($path) as $key => $value) {
+            if (!array_key_exists($key, $merged) || $merged[$key] === '') {
+                $merged[$key] = $value;
+            }
+        }
+    }
+
+    return $merged;
+}
+
+/**
+ * Read one DB setting from environment variables or parsed .env values.
+ */
+function getDbEnvValue(array $env, array $keys, string $default = ''): string
+{
+    foreach ($keys as $key) {
+        $value = getenv($key);
+        if ($value !== false && $value !== '') {
+            return (string) $value;
+        }
+
+        if (!empty($env[$key])) {
+            return (string) $env[$key];
+        }
+    }
+
+    return $default;
+}
+
+/**
  * MySQL config — tries local file, env vars, .env file, then defaults.
  */
 function getDbConfig(): array
@@ -59,42 +104,56 @@ function getDbConfig(): array
         }
     }
 
-    // 2. Real environment variables
-    $envHost = getenv('DB_HOST');
-    if ($envHost !== false && $envHost !== '') {
+    // 2. Real environment variables and project/document-root .env files
+    $env = loadDbEnv();
+    $envHost = getDbEnvValue($env, ['DB_HOST']);
+    if ($envHost !== '') {
         return [
             'host'     => $envHost,
-            'port'     => (int)(getenv('DB_PORT') ?: 3307),
-            'dbname'   => getenv('DB_NAME') ?: 'lan_learn_auth',
-            'username' => getenv('DB_USER') ?: 'root',
-            'password' => getenv('DB_PASSWORD') ?: '',
+            'port'     => (int) getDbEnvValue($env, ['DB_PORT'], '3306'),
+            'dbname'   => getDbEnvValue($env, ['DB_NAME'], 'lan_learn_auth'),
+            'username' => getDbEnvValue($env, ['DB_USER', 'DB_USERNAME'], 'root'),
+            'password' => getDbEnvValue($env, ['DB_PASSWORD'], ''),
             'charset'  => 'utf8mb4',
         ];
     }
 
-    // 3. .env file in document root (Hostinger, etc.)
-    $envFile = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/.env';
-    $env = parseEnvFile($envFile);
-    if (!empty($env['DB_HOST'])) {
-        return [
-            'host'     => $env['DB_HOST'],
-            'port'     => (int)($env['DB_PORT'] ?? 3307),
-            'dbname'   => $env['DB_NAME'] ?? 'lan_learn_auth',
-            'username' => $env['DB_USER'] ?? 'root',
-            'password' => $env['DB_PASSWORD'] ?? '',
-            'charset'  => 'utf8mb4',
-        ];
-    }
-
-    // 4. Default XAMPP config (localhost development)
+    // 3. Default localhost config
     return [
         'host'     => '127.0.0.1',
-        'port'     => 3307,
+        'port'     => 3306,
         'dbname'   => 'lan_learn_auth',
         'username' => 'root',
         'password' => '',
         'charset'  => 'utf8mb4',
     ];
+}
+
+/**
+ * Build candidate localhost ports to try in development.
+ */
+function getLocalDbPorts(int $preferredPort): array
+{
+    $ports = [$preferredPort];
+
+    foreach ([3306, 3307] as $port) {
+        if (!in_array($port, $ports, true)) {
+            $ports[] = $port;
+        }
+    }
+
+    return $ports;
+}
+
+/**
+ * Attempt a PDO connection for one host/port pair.
+ */
+function createMysqlServerConnection(string $host, int $port, string $charset, string $user, string $pass): PDO
+{
+    $dsn = "mysql:host={$host};port={$port};charset={$charset}";
+    return new PDO($dsn, $user, $pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    ]);
 }
 
 /**
@@ -115,11 +174,29 @@ function getLoginDbConnection(): PDO
     $pass    = $c['password'] ?? '';
     $charset = $c['charset']  ?? 'utf8mb4';
 
+    $portsToTry = [$port];
+    if (in_array($host, ['127.0.0.1', 'localhost'], true)) {
+        $portsToTry = getLocalDbPorts($port);
+    }
+
+    $tmp = null;
+    $lastException = null;
+
+    foreach ($portsToTry as $candidatePort) {
+        try {
+            $tmp = createMysqlServerConnection($host, $candidatePort, $charset, $user, $pass);
+            $port = $candidatePort;
+            break;
+        } catch (PDOException $e) {
+            $lastException = $e;
+        }
+    }
+
+    if ($tmp === null) {
+        throw $lastException ?? new PDOException('Unable to connect to MySQL server.');
+    }
+
     // Step 1: Connect WITHOUT database to create it first
-    $dsn1 = "mysql:host={$host};port={$port};charset={$charset}";
-    $tmp  = new PDO($dsn1, $user, $pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-    ]);
     $tmp->exec("CREATE DATABASE IF NOT EXISTS `{$dbname}` CHARACTER SET {$charset} COLLATE {$charset}_unicode_ci");
     $tmp = null; // close
 

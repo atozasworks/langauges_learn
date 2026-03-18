@@ -19,13 +19,13 @@ function getSmtpConfig(): array
     $local = getLocalSmtpConfig();
 
     return [
-        'name' => $local['name'] ?? (getenv('SMTP_NAME') ?: 'atozas.com'),
-        'server' => $local['server'] ?? (getenv('SMTP_SERVER') ?: 'mail.atozas.com'),
-        'port' => (int)($local['port'] ?? (getenv('SMTP_PORT') ?: '465')),
+        'name' => $local['name'] ?? (getenv('SMTP_NAME') ?: ''),
+        'server' => $local['server'] ?? (getenv('SMTP_SERVER') ?: ''),
+        'port' => (int)($local['port'] ?? (getenv('SMTP_PORT') ?: '')),
         'secure' => isset($local['secure'])
             ? (bool)$local['secure']
             : filter_var(getenv('SMTP_SECURE') ?: 'true', FILTER_VALIDATE_BOOLEAN),
-        'email' => $local['email'] ?? (getenv('SMTP_EMAIL') ?: 'no-reply@atozas.com'),
+        'email' => $local['email'] ?? (getenv('SMTP_EMAIL') ?: ''),
         'password' => $local['password'] ?? (getenv('SMTP_EMAIL_PASSWORD') ?: '')
     ];
 }
