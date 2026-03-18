@@ -1,0 +1,12 @@
+[
+    {
+        "email": "chaithradhanduguri@gmail.com",
+        "login_method": "otp",
+        "provider_user_id": null,
+        "display_name": null,
+        "login_status": "success",
+        "client_ip": "::1",
+        "user_agent": "Mozilla\/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit\/537.36 (KHTML, like Gecko) Chrome\/146.0.0.0 Safari\/537.36",
+        "created_at": "2026-03-18 07:56:26"
+    }
+]

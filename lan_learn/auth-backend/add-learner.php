@@ -22,6 +22,14 @@ try {
     $email = trim($body['email'] ?? '');
     $name  = trim($body['name'] ?? '');
 
+    // Location fields (for JSON file-based storage)
+    $location = [
+        'country'  => trim($body['country']  ?? ''),
+        'region'   => trim($body['region']   ?? ''),
+        'district' => trim($body['district'] ?? ''),
+        'place'    => trim($body['place']    ?? ''),
+    ];
+
     if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Valid email is required.']);
@@ -37,13 +45,25 @@ try {
     // Format: capitalize first letter of each word
     $formattedName = mb_convert_case($name, MB_CASE_TITLE, 'UTF-8');
 
-    $newId = addLearner($email, $formattedName);
+    $newId = addLearner($email, $formattedName, $location);
 
     echo json_encode([
         'success' => true,
         'message' => "$formattedName added to your learning team.",
         'learner' => ['id' => $newId, 'name' => $formattedName],
     ]);
+} catch (RuntimeException $e) {
+    if ($e->getMessage() === 'DUPLICATE_ENTRY') {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' => 'This learner already exists in your team.']);
+        exit;
+    }
+    http_response_code(500);
+    $response = ['success' => false, 'message' => 'Server error.'];
+    if (in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'])) {
+        $response['error_detail'] = $e->getMessage();
+    }
+    echo json_encode($response);
 } catch (PDOException $e) {
     // Duplicate entry check (SQLSTATE 23000)
     if ($e->getCode() == 23000) {

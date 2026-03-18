@@ -19,13 +19,21 @@ require_once __DIR__ . '/db.php';
 try {
     $email = trim($_GET['email'] ?? '');
 
+    // Location fields (for JSON file-based storage)
+    $location = [
+        'country'  => trim($_GET['country']  ?? ''),
+        'region'   => trim($_GET['region']   ?? ''),
+        'district' => trim($_GET['district'] ?? ''),
+        'place'    => trim($_GET['place']    ?? ''),
+    ];
+
     if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Valid email parameter is required.']);
         exit;
     }
 
-    $learners = getLearnersByUser($email);
+    $learners = getLearnersByUser($email, $location);
 
     // Map to front-end friendly format
     $result = array_map(function ($row) {

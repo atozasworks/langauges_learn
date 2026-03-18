@@ -12,6 +12,24 @@
 
 error_reporting(E_ALL);
 
+/* ────────────────────────────────────────────
+   Driver check — use JSON file-based DB if configured
+   ──────────────────────────────────────────── */
+$_jsonLocalCfgFile = __DIR__ . '/db-config.local.php';
+if (is_file($_jsonLocalCfgFile)) {
+    $_jsonLocalCfg = require $_jsonLocalCfgFile;
+    if (is_array($_jsonLocalCfg) && ($_jsonLocalCfg['driver'] ?? '') === 'json') {
+        require_once __DIR__ . '/json-db.php';
+        return;
+    }
+}
+unset($_jsonLocalCfgFile, $_jsonLocalCfg);
+
+// If JSON driver was loaded, skip all MySQL function definitions below
+if (defined('JSON_DB_LOADED')):
+    // JSON driver active — do not define any MySQL functions
+else:
+
 /**
  * Parse a .env file into an associative array (does NOT call putenv).
  */
@@ -379,3 +397,5 @@ function verifyOtpCode(string $email, string $otp): bool
 
     return true;
 }
+
+endif; // JSON_DB_LOADED guard

@@ -22,6 +22,14 @@ try {
     $email     = trim($body['email'] ?? '');
     $learnerId = (int) ($body['learner_id'] ?? 0);
 
+    // Location fields (for JSON file-based storage)
+    $location = [
+        'country'  => trim($body['country']  ?? ''),
+        'region'   => trim($body['region']   ?? ''),
+        'district' => trim($body['district'] ?? ''),
+        'place'    => trim($body['place']    ?? ''),
+    ];
+
     if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Valid email is required.']);
@@ -34,7 +42,7 @@ try {
         exit;
     }
 
-    $deleted = deleteLearner($email, $learnerId);
+    $deleted = deleteLearner($email, $learnerId, $location);
 
     if ($deleted) {
         echo json_encode(['success' => true, 'message' => 'Learner removed from your team.']);

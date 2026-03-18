@@ -5,15 +5,21 @@ class LearnHome {
         this.selectedLearners = [];
         this.dataTable = null;
         this.loggedInUser = null; // { name, email }
+        this.allLocations = []; // All stored location combos from server
+        this.currentLocation = { country: '', region: '', district: '', place: '' };
+        this.locationDebounceTimer = null;
         this.init();
     }
 
     async init() {
         this.resolveLoggedInUser();
+        this.restoreCurrentLocation();
         this.setupEventListeners();
+        this.setupLocationListeners();
         this.initializeDataTable();
 
         if (this.loggedInUser) {
+            await this.loadLocationsFromServer();
             await this.loadLearnersFromServer();
         } else {
             this.showLoginRequiredState();
@@ -46,6 +52,8 @@ class LearnHome {
     async onUserLogin(detail) {
         this.loggedInUser = detail; // { name, email }
         this.hideLoginRequiredState();
+        this.restoreCurrentLocation();
+        await this.loadLocationsFromServer();
         await this.loadLearnersFromServer();
         this.refreshTable();
         this.updateCounts();
@@ -85,6 +93,150 @@ class LearnHome {
         if (input) { input.disabled = false; input.placeholder = "Enter Learner's Name"; }
         if (addBtn) addBtn.disabled = false;
         if (startBtn) startBtn.disabled = false;
+    }
+
+    // ─── Location helpers ───────────────────────────────
+
+    restoreCurrentLocation() {
+        if (!this.loggedInUser) return;
+        const storageKey = `currentLocation_${this.loggedInUser.email}`;
+        try {
+            const saved = localStorage.getItem(storageKey);
+            if (saved) {
+                const loc = JSON.parse(saved);
+                if (loc && typeof loc === 'object') {
+                    this.currentLocation = {
+                        country: loc.country || '',
+                        region: loc.region || '',
+                        district: loc.district || '',
+                        place: loc.place || '',
+                    };
+                }
+            }
+        } catch (_) {}
+        // Populate the input fields
+        this.populateLocationInputs();
+    }
+
+    saveCurrentLocation() {
+        if (!this.loggedInUser) return;
+        const storageKey = `currentLocation_${this.loggedInUser.email}`;
+        localStorage.setItem(storageKey, JSON.stringify(this.currentLocation));
+    }
+
+    populateLocationInputs() {
+        const fields = ['country', 'region', 'district', 'place'];
+        fields.forEach(f => {
+            const el = document.getElementById(`location-${f}`);
+            if (el) el.value = this.currentLocation[f] || '';
+        });
+    }
+
+    readLocationFromInputs() {
+        return {
+            country:  (document.getElementById('location-country')?.value || '').trim(),
+            region:   (document.getElementById('location-region')?.value || '').trim(),
+            district: (document.getElementById('location-district')?.value || '').trim(),
+            place:    (document.getElementById('location-place')?.value || '').trim(),
+        };
+    }
+
+    setupLocationListeners() {
+        const fields = ['country', 'region', 'district', 'place'];
+        fields.forEach(f => {
+            const el = document.getElementById(`location-${f}`);
+            if (el) {
+                el.addEventListener('input', () => this.onLocationFieldChange(f));
+                el.addEventListener('change', () => this.onLocationFieldChange(f));
+            }
+        });
+    }
+
+    onLocationFieldChange(changedField) {
+        const newLoc = this.readLocationFromInputs();
+
+        // Clear child fields when a parent field changes
+        const hierarchy = ['country', 'region', 'district', 'place'];
+        const changedIdx = hierarchy.indexOf(changedField);
+        if (changedIdx >= 0) {
+            for (let i = changedIdx + 1; i < hierarchy.length; i++) {
+                const childEl = document.getElementById(`location-${hierarchy[i]}`);
+                if (childEl && this.currentLocation[hierarchy[i]] !== '' &&
+                    newLoc[changedField] !== this.currentLocation[changedField]) {
+                    // Parent changed — clear children
+                    childEl.value = '';
+                    newLoc[hierarchy[i]] = '';
+                }
+            }
+        }
+
+        this.currentLocation = newLoc;
+        this.saveCurrentLocation();
+        this.updateLocationDataLists();
+
+        // Debounce reload learners
+        clearTimeout(this.locationDebounceTimer);
+        this.locationDebounceTimer = setTimeout(() => {
+            if (this.loggedInUser) {
+                this.loadLearnersFromServer();
+            }
+        }, 500);
+    }
+
+    async loadLocationsFromServer() {
+        try {
+            const res = await fetch('./auth-backend/get-locations.php');
+            const data = await res.json();
+            if (res.ok && data.success) {
+                this.allLocations = data.locations || [];
+            } else {
+                this.allLocations = [];
+            }
+        } catch (err) {
+            console.warn('Error loading locations:', err);
+            this.allLocations = [];
+        }
+        this.updateLocationDataLists();
+    }
+
+    updateLocationDataLists() {
+        const loc = this.currentLocation;
+
+        // Countries: all unique
+        const countries = [...new Set(this.allLocations.map(l => l.country).filter(Boolean))];
+        this.fillDataList('country-list', countries);
+
+        // Regions: filter by current country
+        const filteredByCountry = this.allLocations.filter(l =>
+            !loc.country || l.country === loc.country
+        );
+        const regions = [...new Set(filteredByCountry.map(l => l.region).filter(Boolean))];
+        this.fillDataList('region-list', regions);
+
+        // Districts: filter by country + region
+        const filteredByRegion = filteredByCountry.filter(l =>
+            !loc.region || l.region === loc.region
+        );
+        const districts = [...new Set(filteredByRegion.map(l => l.district).filter(Boolean))];
+        this.fillDataList('district-list', districts);
+
+        // Places: filter by country + region + district
+        const filteredByDistrict = filteredByRegion.filter(l =>
+            !loc.district || l.district === loc.district
+        );
+        const places = [...new Set(filteredByDistrict.map(l => l.place).filter(Boolean))];
+        this.fillDataList('place-list', places);
+    }
+
+    fillDataList(datalistId, values) {
+        const dl = document.getElementById(datalistId);
+        if (!dl) return;
+        dl.innerHTML = '';
+        values.sort().forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v;
+            dl.appendChild(opt);
+        });
     }
 
     // ─── Event listeners ────────────────────────────────
@@ -254,7 +406,14 @@ class LearnHome {
             const res = await fetch('./auth-backend/add-learner.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: this.loggedInUser.email, name: formattedName })
+                body: JSON.stringify({
+                    email: this.loggedInUser.email,
+                    name: formattedName,
+                    country: this.currentLocation.country,
+                    region: this.currentLocation.region,
+                    district: this.currentLocation.district,
+                    place: this.currentLocation.place,
+                })
             });
             const data = await res.json();
 
@@ -271,6 +430,9 @@ class LearnHome {
             this.updateCounts();
             input.value = '';
             Utils.showToast(`${newLearner.name} added and selected for studies`, 'success');
+
+            // Refresh locations (new location may have been added)
+            this.loadLocationsFromServer();
         } catch (err) {
             console.error('Add learner error:', err);
             Utils.showToast('Server error while adding learner.', 'error');
@@ -299,7 +461,14 @@ class LearnHome {
             const res = await fetch('./auth-backend/delete-learner.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: this.loggedInUser.email, learner_id: id })
+                body: JSON.stringify({
+                    email: this.loggedInUser.email,
+                    learner_id: id,
+                    country: this.currentLocation.country,
+                    region: this.currentLocation.region,
+                    district: this.currentLocation.district,
+                    place: this.currentLocation.place,
+                })
             });
             const data = await res.json();
 
@@ -469,7 +638,14 @@ class LearnHome {
         if (!this.loggedInUser) return;
 
         try {
-            const url = `./auth-backend/get-learners.php?email=${encodeURIComponent(this.loggedInUser.email)}`;
+            const params = new URLSearchParams({
+                email: this.loggedInUser.email,
+                country: this.currentLocation.country,
+                region: this.currentLocation.region,
+                district: this.currentLocation.district,
+                place: this.currentLocation.place,
+            });
+            const url = `./auth-backend/get-learners.php?${params.toString()}`;
             const res = await fetch(url);
             const data = await res.json();
 
