@@ -1,7 +1,7 @@
 <?php
 /**
  * POST /auth-backend/delete-learner.php
- * Body: { "email": "...", "learner_id": 123 }
+ * Body: { "email": "...", "learner_id": 123, "country": "...", "region": "...", "district": "...", "place": "..." }
  * Deletes a learner from the logged-in user's team (only if it belongs to them).
  */
 
@@ -21,6 +21,10 @@ try {
     $body      = json_decode(file_get_contents('php://input'), true);
     $email     = trim($body['email'] ?? '');
     $learnerId = (int) ($body['learner_id'] ?? 0);
+    $country   = trim($body['country'] ?? '');
+    $region    = trim($body['region'] ?? '');
+    $district  = trim($body['district'] ?? '');
+    $place     = trim($body['place'] ?? '');
 
     if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
@@ -34,7 +38,7 @@ try {
         exit;
     }
 
-    $deleted = deleteLearner($email, $learnerId);
+    $deleted = deleteLearner($email, $learnerId, $country, $region, $district, $place);
 
     if ($deleted) {
         echo json_encode(['success' => true, 'message' => 'Learner removed from your team.']);

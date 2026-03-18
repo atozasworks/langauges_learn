@@ -1,7 +1,7 @@
 <?php
 /**
- * GET /auth-backend/get-learners.php?email=user@example.com
- * Returns all learners belonging to the logged-in user.
+ * GET /auth-backend/get-learners.php?email=user@example.com&country=...&region=...&district=...&place=...
+ * Returns all learners belonging to the logged-in user at the specified location.
  */
 
 header('Content-Type: application/json');
@@ -17,7 +17,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/db.php';
 
 try {
-    $email = trim($_GET['email'] ?? '');
+    $email    = trim($_GET['email'] ?? '');
+    $country  = trim($_GET['country'] ?? '');
+    $region   = trim($_GET['region'] ?? '');
+    $district = trim($_GET['district'] ?? '');
+    $place    = trim($_GET['place'] ?? '');
 
     if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
@@ -25,7 +29,7 @@ try {
         exit;
     }
 
-    $learners = getLearnersByUser($email);
+    $learners = getLearnersByUser($email, $country, $region, $district, $place);
 
     // Map to front-end friendly format
     $result = array_map(function ($row) {

@@ -1,8 +1,8 @@
 <?php
 /**
  * POST /auth-backend/add-learner.php
- * Body: { "email": "...", "name": "..." }
- * Adds a learner to the logged-in user's team.
+ * Body: { "email": "...", "name": "...", "country": "...", "region": "...", "district": "...", "place": "..." }
+ * Adds a learner to the logged-in user's team at the specified location.
  */
 
 header('Content-Type: application/json');
@@ -18,9 +18,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/db.php';
 
 try {
-    $body  = json_decode(file_get_contents('php://input'), true);
-    $email = trim($body['email'] ?? '');
-    $name  = trim($body['name'] ?? '');
+    $body     = json_decode(file_get_contents('php://input'), true);
+    $email    = trim($body['email'] ?? '');
+    $name     = trim($body['name'] ?? '');
+    $country  = trim($body['country'] ?? '');
+    $region   = trim($body['region'] ?? '');
+    $district = trim($body['district'] ?? '');
+    $place    = trim($body['place'] ?? '');
 
     if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
@@ -37,16 +41,15 @@ try {
     // Format: capitalize first letter of each word
     $formattedName = mb_convert_case($name, MB_CASE_TITLE, 'UTF-8');
 
-    $newId = addLearner($email, $formattedName);
+    $newId = addLearner($email, $formattedName, $country, $region, $district, $place);
 
     echo json_encode([
         'success' => true,
         'message' => "$formattedName added to your learning team.",
         'learner' => ['id' => $newId, 'name' => $formattedName],
     ]);
-} catch (PDOException $e) {
-    // Duplicate entry check (SQLSTATE 23000)
-    if ($e->getCode() == 23000) {
+} catch (RuntimeException $e) {
+    if ($e->getMessage() === 'DUPLICATE_ENTRY') {
         http_response_code(409);
         echo json_encode(['success' => false, 'message' => 'This learner already exists in your team.']);
         exit;

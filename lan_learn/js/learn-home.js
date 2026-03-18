@@ -5,12 +5,15 @@ class LearnHome {
         this.selectedLearners = [];
         this.dataTable = null;
         this.loggedInUser = null; // { name, email }
+        this.location = { country: '', region: '', district: '', place: '' };
         this.init();
     }
 
     async init() {
         this.resolveLoggedInUser();
+        this.loadLocationPreference();
         this.setupEventListeners();
+        this.setupLocationListeners();
         this.initializeDataTable();
 
         if (this.loggedInUser) {
@@ -21,6 +24,9 @@ class LearnHome {
 
         this.updateCounts();
         setTimeout(() => this.updateSelectAllCheckbox(), 100);
+
+        // Load location autocomplete suggestions
+        this.loadLocationsFromServer();
 
         // Listen for login / logout events dispatched by login-modal.js
         window.addEventListener('userLogin', (e) => this.onUserLogin(e.detail));
@@ -85,6 +91,91 @@ class LearnHome {
         if (input) { input.disabled = false; input.placeholder = "Enter Learner's Name"; }
         if (addBtn) addBtn.disabled = false;
         if (startBtn) startBtn.disabled = false;
+    }
+
+    // ─── Location helpers ───────────────────────────────
+
+    loadLocationPreference() {
+        try {
+            const saved = localStorage.getItem('selectedLocation');
+            if (saved) {
+                this.location = JSON.parse(saved);
+                const fields = { country: 'location-country', region: 'location-region', district: 'location-district', place: 'location-place' };
+                for (const [key, id] of Object.entries(fields)) {
+                    const el = document.getElementById(id);
+                    if (el) el.value = this.location[key] || '';
+                }
+            }
+        } catch (_) {}
+    }
+
+    saveLocationPreference() {
+        localStorage.setItem('selectedLocation', JSON.stringify(this.location));
+    }
+
+    setupLocationListeners() {
+        const ids = ['location-country', 'location-region', 'location-district', 'location-place'];
+        ids.forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('change', () => this.onLocationChange());
+            }
+        });
+    }
+
+    onLocationChange() {
+        this.location = {
+            country:  document.getElementById('location-country')?.value.trim() || '',
+            region:   document.getElementById('location-region')?.value.trim() || '',
+            district: document.getElementById('location-district')?.value.trim() || '',
+            place:    document.getElementById('location-place')?.value.trim() || '',
+        };
+        this.saveLocationPreference();
+
+        // Reload learners for the new location
+        if (this.loggedInUser) {
+            this.loadLearnersFromServer();
+        }
+    }
+
+    async loadLocationsFromServer() {
+        try {
+            const res = await fetch('./auth-backend/get-locations.php');
+            const data = await res.json();
+            if (data.success) {
+                this.populateLocationDatalist('country-list', data.locations.countries);
+                this.populateLocationDatalist('region-list', data.locations.regions);
+                this.populateLocationDatalist('district-list', data.locations.districts);
+                this.populateLocationDatalist('place-list', data.locations.places);
+            }
+        } catch (e) {
+            console.warn('Failed to load locations:', e);
+        }
+    }
+
+    populateLocationDatalist(id, values) {
+        const datalist = document.getElementById(id);
+        if (!datalist) return;
+        datalist.innerHTML = '';
+        values.forEach(v => {
+            const option = document.createElement('option');
+            option.value = v;
+            datalist.appendChild(option);
+        });
+    }
+
+    getLocationParams() {
+        return {
+            country:  this.location.country  || '',
+            region:   this.location.region   || '',
+            district: this.location.district || '',
+            place:    this.location.place    || '',
+        };
+    }
+
+    getLocationQueryString() {
+        const loc = this.getLocationParams();
+        return `&country=${encodeURIComponent(loc.country)}&region=${encodeURIComponent(loc.region)}&district=${encodeURIComponent(loc.district)}&place=${encodeURIComponent(loc.place)}`;
     }
 
     // ─── Event listeners ────────────────────────────────
@@ -230,7 +321,7 @@ class LearnHome {
             const res = await fetch('./auth-backend/add-learner.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: this.loggedInUser.email, name: formattedName })
+                body: JSON.stringify({ email: this.loggedInUser.email, name: formattedName, ...this.getLocationParams() })
             });
             const data = await res.json();
 
@@ -247,6 +338,8 @@ class LearnHome {
             this.updateCounts();
             input.value = '';
             Utils.showToast(`${newLearner.name} added and selected for studies`, 'success');
+            // Refresh location autocomplete in case this was a new location
+            this.loadLocationsFromServer();
         } catch (err) {
             console.error('Add learner error:', err);
             Utils.showToast('Server error while adding learner.', 'error');
@@ -275,7 +368,7 @@ class LearnHome {
             const res = await fetch('./auth-backend/delete-learner.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: this.loggedInUser.email, learner_id: id })
+                body: JSON.stringify({ email: this.loggedInUser.email, learner_id: id, ...this.getLocationParams() })
             });
             const data = await res.json();
 
@@ -445,7 +538,7 @@ class LearnHome {
         if (!this.loggedInUser) return;
 
         try {
-            const url = `./auth-backend/get-learners.php?email=${encodeURIComponent(this.loggedInUser.email)}`;
+            const url = `./auth-backend/get-learners.php?email=${encodeURIComponent(this.loggedInUser.email)}${this.getLocationQueryString()}`;
             const res = await fetch(url);
             const data = await res.json();
 

@@ -1,0 +1,29 @@
+{
+    "location": {
+        "country": "kadaba",
+        "region": "karnataka",
+        "district": "dakshinakannada",
+        "place": "kadaba"
+    },
+    "users": {
+        "chaithradhanduguri@gmail.com": {
+            "learners": [
+                {
+                    "id": 1,
+                    "learner_name": "Chithra",
+                    "created_at": "2026-03-18 06:42:38"
+                },
+                {
+                    "id": 2,
+                    "learner_name": "Akhila",
+                    "created_at": "2026-03-18 06:42:45"
+                },
+                {
+                    "id": 3,
+                    "learner_name": "Vathsala",
+                    "created_at": "2026-03-18 07:00:54"
+                }
+            ]
+        }
+    }
+}

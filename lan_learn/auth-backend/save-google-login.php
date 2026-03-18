@@ -1,6 +1,6 @@
 <?php
 /**
- * Save Google login endpoint — verifies access token and saves to MySQL.
+ * Save Google login endpoint — verifies access token and saves to JSON.
  */
 
 // Show errors for debugging (remove in production)
@@ -93,7 +93,7 @@ try {
         exit;
     }
 
-    // Try to save to MySQL (optional — don't block login if DB is unavailable)
+    // Try to save to JSON (optional — don't block login if save fails)
     $dbSaved = false;
     try {
         require_once __DIR__ . '/db.php';
@@ -106,13 +106,13 @@ try {
         ]);
         $dbSaved = true;
     } catch (Throwable $dbErr) {
-        // DB save failed — log it but don't block Google login
-        error_log('Google login DB save failed: ' . $dbErr->getMessage());
+        // JSON save failed — log it but don't block Google login
+        error_log('Google login save failed: ' . $dbErr->getMessage());
     }
 
     echo json_encode([
         'success' => true,
-        'message' => $dbSaved ? 'Google login saved successfully.' : 'Google login verified (DB save skipped).',
+        'message' => $dbSaved ? 'Google login saved successfully.' : 'Google login verified (save skipped).',
         'user'    => [
             'email'   => $email,
             'name'    => $name,

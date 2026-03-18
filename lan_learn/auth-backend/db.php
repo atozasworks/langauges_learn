@@ -1,182 +1,121 @@
 <?php
 /**
- * Database helper — works with both XAMPP (local) and Hostinger (live).
- * Auto-creates tables `login_audit`, `otp_codes`, `learning_team`.
+ * JSON file-based database helper — replaces MySQL.
+ * Stores data in the data/ directory as JSON files.
  *
- * Config priority:
- *   1. db-config.local.php  (per-environment file, not committed)
- *   2. Environment variables DB_HOST, DB_NAME, DB_USER, DB_PASSWORD
- *   3. .env file in document root (Hostinger / other hosts)
- *   4. Default XAMPP config (root / no password)
+ * Data files:
+ *   - data/login_audit.json                          (login events)
+ *   - data/otp_codes.json                            (OTP codes)
+ *   - data/{country}_{region}_{district}_{place}.json (learners per location)
  */
 
 error_reporting(E_ALL);
 
 /**
- * Parse a .env file into an associative array (does NOT call putenv).
+ * Get the data directory path from config or default.
  */
-function parseEnvFile(string $path): array
+function getDataDir(): string
+{
+    static $dir = null;
+    if ($dir !== null) {
+        return $dir;
+    }
+
+    $localFile = __DIR__ . '/db-config.local.php';
+    if (is_file($localFile)) {
+        $cfg = require $localFile;
+        if (is_array($cfg) && !empty($cfg['data_dir'])) {
+            $dir = rtrim($cfg['data_dir'], '/\\');
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            return $dir;
+        }
+    }
+
+    $dir = __DIR__ . '/data';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+    return $dir;
+}
+
+/**
+ * Sanitize a single location segment for use in filenames.
+ */
+function sanitizeSegment(string $s): string
+{
+    $s = trim($s);
+    $s = str_replace(' ', '-', $s);
+    return preg_replace('/[^a-zA-Z0-9-]/', '', $s);
+}
+
+/**
+ * Build a safe filename key from location fields.
+ * Empty fields are preserved as empty segments between underscores.
+ */
+function buildLocationKey(string $country, string $region, string $district, string $place): string
+{
+    $parts = array_map('sanitizeSegment', [$country, $region, $district, $place]);
+    $key = implode('_', $parts);
+    // If all fields are empty the key is "___" — use a default
+    if (preg_match('/^_*$/', $key)) {
+        $key = '_default';
+    }
+    return $key;
+}
+
+/**
+ * Get the file path for a location-based learner JSON file.
+ */
+function getLocationFilePath(string $country, string $region, string $district, string $place): string
+{
+    return getDataDir() . '/' . buildLocationKey($country, $region, $district, $place) . '.json';
+}
+
+/**
+ * Read a JSON file and return its contents as an array.
+ */
+function readJsonFile(string $path): array
 {
     if (!is_file($path)) {
         return [];
     }
-    $vars = [];
-    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-        $line = trim($line);
-        if ($line === '' || $line[0] === '#') {
-            continue;
-        }
-        if (strpos($line, '=') === false) {
-            continue;
-        }
-        [$key, $value] = explode('=', $line, 2);
-        $key   = trim($key);
-        $value = trim($value);
-        // Strip surrounding quotes
-        if (preg_match('/^(["\'])(.*)\\1$/', $value, $m)) {
-            $value = $m[2];
-        }
-        // Strip inline comments (e.g., "value #comment")
-        if (($pos = strpos($value, ' #')) !== false) {
-            $value = rtrim(substr($value, 0, $pos));
-        }
-        $vars[$key] = $value;
+    $content = file_get_contents($path);
+    if ($content === false || $content === '') {
+        return [];
     }
-    return $vars;
+    $data = json_decode($content, true);
+    return is_array($data) ? $data : [];
 }
 
 /**
- * MySQL config — tries local file, env vars, .env file, then defaults.
+ * Write data to a JSON file with exclusive file locking.
  */
-function getDbConfig(): array
+function writeJsonFile(string $path, array $data): void
 {
-    // 1. Local config file (highest priority)
-    $localFile = __DIR__ . '/db-config.local.php';
-    if (is_file($localFile)) {
-        $cfg = require $localFile;
-        if (is_array($cfg)) {
-            return $cfg;
-        }
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
     }
 
-    // 2. Real environment variables
-    $envHost = getenv('DB_HOST');
-    if ($envHost !== false && $envHost !== '') {
-        return [
-            'host'     => $envHost,
-            'port'     => (int)(getenv('DB_PORT') ?: 3307),
-            'dbname'   => getenv('DB_NAME') ?: 'lan_learn_auth',
-            'username' => getenv('DB_USER') ?: 'root',
-            'password' => getenv('DB_PASSWORD') ?: '',
-            'charset'  => 'utf8mb4',
-        ];
+    $fp = fopen($path, 'c');
+    if (!$fp) {
+        throw new RuntimeException("Cannot open file: $path");
     }
 
-    // 3. .env file in document root (Hostinger, etc.)
-    $envFile = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/.env';
-    $env = parseEnvFile($envFile);
-    if (!empty($env['DB_HOST'])) {
-        return [
-            'host'     => $env['DB_HOST'],
-            'port'     => (int)($env['DB_PORT'] ?? 3307),
-            'dbname'   => $env['DB_NAME'] ?? 'lan_learn_auth',
-            'username' => $env['DB_USER'] ?? 'root',
-            'password' => $env['DB_PASSWORD'] ?? '',
-            'charset'  => 'utf8mb4',
-        ];
+    if (flock($fp, LOCK_EX)) {
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        fflush($fp);
+        flock($fp, LOCK_UN);
+    } else {
+        fclose($fp);
+        throw new RuntimeException("Cannot lock file: $path");
     }
 
-    // 4. Default XAMPP config (localhost development)
-    return [
-        'host'     => '127.0.0.1',
-        'port'     => 3307,
-        'dbname'   => 'lan_learn_auth',
-        'username' => 'root',
-        'password' => '',
-        'charset'  => 'utf8mb4',
-    ];
-}
-
-/**
- * Returns a PDO MySQL connection. Creates DB and tables on first call.
- */
-function getLoginDbConnection(): PDO
-{
-    static $pdo = null;
-    if ($pdo !== null) {
-        return $pdo;
-    }
-
-    $c = getDbConfig();
-    $host    = $c['host']     ?? '127.0.0.1';
-    $port    = (int)($c['port'] ?? 3307);
-    $dbname  = $c['dbname']   ?? 'lan_learn_auth';
-    $user    = $c['username'] ?? 'root';
-    $pass    = $c['password'] ?? '';
-    $charset = $c['charset']  ?? 'utf8mb4';
-
-    // Step 1: Connect WITHOUT database to create it first
-    $dsn1 = "mysql:host={$host};port={$port};charset={$charset}";
-    $tmp  = new PDO($dsn1, $user, $pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-    ]);
-    $tmp->exec("CREATE DATABASE IF NOT EXISTS `{$dbname}` CHARACTER SET {$charset} COLLATE {$charset}_unicode_ci");
-    $tmp = null; // close
-
-    // Step 2: Connect TO the database
-    $dsn2 = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
-    $pdo  = new PDO($dsn2, $user, $pass, [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
-
-    // Step 3: Create tables
-    createTables($pdo);
-
-    return $pdo;
-}
-
-/**
- * Creates login_audit and otp_codes tables if they don't exist.
- */
-function createTables(PDO $pdo): void
-{
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS `login_audit` (
-            `id`               INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `email`            VARCHAR(255) NOT NULL,
-            `login_method`     VARCHAR(30)  NOT NULL,
-            `provider_user_id` VARCHAR(255) NULL,
-            `display_name`     VARCHAR(255) NULL,
-            `login_status`     VARCHAR(20)  NOT NULL DEFAULT 'success',
-            `client_ip`        VARCHAR(64)  NULL,
-            `user_agent`       TEXT         NULL,
-            `created_at`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS `otp_codes` (
-            `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `email`      VARCHAR(255) NOT NULL,
-            `otp_hash`   VARCHAR(255) NOT NULL,
-            `expires_at` DATETIME     NOT NULL,
-            `used_at`    DATETIME     NULL,
-            `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX `idx_otp_email` (`email`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS `learning_team` (
-            `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            `user_email`    VARCHAR(255) NOT NULL,
-            `learner_name`  VARCHAR(255) NOT NULL,
-            `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX `idx_lt_user` (`user_email`),
-            UNIQUE KEY `uk_user_learner` (`user_email`, `learner_name`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
+    fclose($fp);
 }
 
 /* ────────────────────────────────────────────
@@ -184,121 +123,220 @@ function createTables(PDO $pdo): void
    ──────────────────────────────────────────── */
 
 /**
- * Get all learners for a specific user.
+ * Get all learners for a specific user at a given location.
  */
-function getLearnersByUser(string $email): array
+function getLearnersByUser(string $email, string $country = '', string $region = '', string $district = '', string $place = ''): array
 {
-    $pdo = getLoginDbConnection();
-    $stmt = $pdo->prepare("SELECT id, learner_name FROM `learning_team` WHERE user_email = :email ORDER BY created_at ASC");
-    $stmt->execute([':email' => $email]);
-    return $stmt->fetchAll();
+    $filePath = getLocationFilePath($country, $region, $district, $place);
+    $data = readJsonFile($filePath);
+    return $data['users'][$email]['learners'] ?? [];
 }
 
 /**
- * Add a learner to a user's team. Returns the new row id.
+ * Add a learner to a user's team at a given location. Returns the new row id.
+ * Throws RuntimeException with message 'DUPLICATE_ENTRY' on duplicate.
  */
-function addLearner(string $email, string $name): int
+function addLearner(string $email, string $name, string $country = '', string $region = '', string $district = '', string $place = ''): int
 {
-    $pdo = getLoginDbConnection();
-    $stmt = $pdo->prepare("INSERT INTO `learning_team` (user_email, learner_name) VALUES (:email, :name)");
-    $stmt->execute([':email' => $email, ':name' => $name]);
-    return (int) $pdo->lastInsertId();
+    $filePath = getLocationFilePath($country, $region, $district, $place);
+    $data = readJsonFile($filePath);
+
+    // Initialize structure
+    if (!isset($data['location'])) {
+        $data['location'] = compact('country', 'region', 'district', 'place');
+    }
+    if (!isset($data['users'])) {
+        $data['users'] = [];
+    }
+    if (!isset($data['users'][$email])) {
+        $data['users'][$email] = ['learners' => []];
+    }
+
+    // Duplicate check
+    foreach ($data['users'][$email]['learners'] as $learner) {
+        if (strcasecmp($learner['learner_name'], $name) === 0) {
+            throw new RuntimeException('DUPLICATE_ENTRY');
+        }
+    }
+
+    // Generate next ID (global across all users in this file)
+    $maxId = 0;
+    foreach ($data['users'] as $userData) {
+        foreach ($userData['learners'] ?? [] as $l) {
+            if (($l['id'] ?? 0) > $maxId) {
+                $maxId = $l['id'];
+            }
+        }
+    }
+    $newId = $maxId + 1;
+
+    $data['users'][$email]['learners'][] = [
+        'id'           => $newId,
+        'learner_name' => $name,
+        'created_at'   => date('Y-m-d H:i:s'),
+    ];
+
+    writeJsonFile($filePath, $data);
+    return $newId;
 }
 
 /**
- * Delete a learner from a user's team (only if it belongs to that user).
+ * Delete a learner from a user's team at a given location.
  */
-function deleteLearner(string $email, int $learnerId): bool
+function deleteLearner(string $email, int $learnerId, string $country = '', string $region = '', string $district = '', string $place = ''): bool
 {
-    $pdo = getLoginDbConnection();
-    $stmt = $pdo->prepare("DELETE FROM `learning_team` WHERE id = :id AND user_email = :email LIMIT 1");
-    $stmt->execute([':id' => $learnerId, ':email' => $email]);
-    return $stmt->rowCount() > 0;
+    $filePath = getLocationFilePath($country, $region, $district, $place);
+    $data = readJsonFile($filePath);
+
+    if (!isset($data['users'][$email]['learners'])) {
+        return false;
+    }
+
+    $found = false;
+    $data['users'][$email]['learners'] = array_values(
+        array_filter($data['users'][$email]['learners'], function ($l) use ($learnerId, &$found) {
+            if ($l['id'] === $learnerId) {
+                $found = true;
+                return false;
+            }
+            return true;
+        })
+    );
+
+    if ($found) {
+        writeJsonFile($filePath, $data);
+    }
+
+    return $found;
 }
 
+/* ────────────────────────────────────────────
+   Login Audit helpers
+   ──────────────────────────────────────────── */
+
 /**
- * Save a login event.
+ * Save a login event to login_audit.json.
  */
 function saveLoginAudit(array $rec): void
 {
-    $pdo = getLoginDbConnection();
-    $stmt = $pdo->prepare("
-        INSERT INTO `login_audit`
-            (email, login_method, provider_user_id, display_name, login_status, client_ip, user_agent, created_at)
-        VALUES
-            (:email, :method, :pid, :name, :status, :ip, :ua, NOW())
-    ");
-    $stmt->execute([
-        ':email'  => $rec['email'] ?? '',
-        ':method' => $rec['login_method'] ?? 'unknown',
-        ':pid'    => $rec['provider_user_id'] ?? null,
-        ':name'   => $rec['display_name'] ?? null,
-        ':status' => $rec['login_status'] ?? 'success',
-        ':ip'     => $_SERVER['REMOTE_ADDR'] ?? null,
-        ':ua'     => $_SERVER['HTTP_USER_AGENT'] ?? null,
-    ]);
+    $filePath = getDataDir() . '/login_audit.json';
+    $data = readJsonFile($filePath);
+
+    if (!isset($data['entries'])) {
+        $data['entries'] = [];
+    }
+
+    $maxId = 0;
+    foreach ($data['entries'] as $entry) {
+        if (($entry['id'] ?? 0) > $maxId) {
+            $maxId = $entry['id'];
+        }
+    }
+
+    $data['entries'][] = [
+        'id'               => $maxId + 1,
+        'email'            => $rec['email'] ?? '',
+        'login_method'     => $rec['login_method'] ?? 'unknown',
+        'provider_user_id' => $rec['provider_user_id'] ?? null,
+        'display_name'     => $rec['display_name'] ?? null,
+        'login_status'     => $rec['login_status'] ?? 'success',
+        'client_ip'        => $_SERVER['REMOTE_ADDR'] ?? null,
+        'user_agent'       => $_SERVER['HTTP_USER_AGENT'] ?? null,
+        'created_at'       => date('Y-m-d H:i:s'),
+    ];
+
+    writeJsonFile($filePath, $data);
 }
+
+/* ────────────────────────────────────────────
+   OTP helpers
+   ──────────────────────────────────────────── */
 
 /**
  * Save OTP hash; expire previous unused OTPs for the same email.
  */
 function saveOtpCode(string $email, string $otp, int $ttl = 300): void
 {
-    $pdo = getLoginDbConnection();
+    $filePath = getDataDir() . '/otp_codes.json';
+    $data = readJsonFile($filePath);
 
-    // Expire old unused OTPs
-    $pdo->prepare("UPDATE `otp_codes` SET used_at = NOW() WHERE email = :email AND used_at IS NULL")
-        ->execute([':email' => $email]);
+    if (!isset($data['codes'])) {
+        $data['codes'] = [];
+    }
 
-    // Calculate expiry in PHP (avoids INTERVAL :param issue in some MySQL versions)
+    // Expire old unused OTPs for this email
+    foreach ($data['codes'] as &$code) {
+        if ($code['email'] === $email && $code['used_at'] === null) {
+            $code['used_at'] = date('Y-m-d H:i:s');
+        }
+    }
+    unset($code);
+
+    $maxId = 0;
+    foreach ($data['codes'] as $c) {
+        if (($c['id'] ?? 0) > $maxId) {
+            $maxId = $c['id'];
+        }
+    }
+
     $expiresAt = date('Y-m-d H:i:s', time() + $ttl);
 
-    // Insert new OTP
-    $stmt = $pdo->prepare("
-        INSERT INTO `otp_codes` (email, otp_hash, expires_at, used_at, created_at)
-        VALUES (:email, :hash, :expires, NULL, NOW())
-    ");
-    $stmt->execute([
-        ':email'   => $email,
-        ':hash'    => password_hash($otp, PASSWORD_DEFAULT),
-        ':expires' => $expiresAt,
-    ]);
+    $data['codes'][] = [
+        'id'         => $maxId + 1,
+        'email'      => $email,
+        'otp_hash'   => password_hash($otp, PASSWORD_DEFAULT),
+        'expires_at' => $expiresAt,
+        'used_at'    => null,
+        'created_at' => date('Y-m-d H:i:s'),
+    ];
+
+    writeJsonFile($filePath, $data);
 }
 
 /**
- * Verify OTP — checks latest unused row for the email.
+ * Verify OTP — checks latest unused code for the email.
  */
 function verifyOtpCode(string $email, string $otp): bool
 {
-    $pdo = getLoginDbConnection();
+    $filePath = getDataDir() . '/otp_codes.json';
+    $data = readJsonFile($filePath);
 
-    $stmt = $pdo->prepare("
-        SELECT id, otp_hash, expires_at
-        FROM `otp_codes`
-        WHERE email = :email AND used_at IS NULL
-        ORDER BY id DESC
-        LIMIT 1
-    ");
-    $stmt->execute([':email' => $email]);
-    $row = $stmt->fetch();
-
-    if (!$row) {
+    if (empty($data['codes'])) {
         return false;
     }
 
+    // Find latest unused OTP for this email
+    $candidates = array_filter($data['codes'], function ($c) use ($email) {
+        return $c['email'] === $email && $c['used_at'] === null;
+    });
+
+    if (empty($candidates)) {
+        return false;
+    }
+
+    // Sort descending by id to get the latest
+    usort($candidates, fn($a, $b) => ($b['id'] ?? 0) - ($a['id'] ?? 0));
+    $latest = $candidates[0];
+
     // Check expiry
-    if (strtotime($row['expires_at']) < time()) {
+    if (strtotime($latest['expires_at']) < time()) {
         return false;
     }
 
     // Verify hash
-    if (!password_verify($otp, $row['otp_hash'])) {
+    if (!password_verify($otp, $latest['otp_hash'])) {
         return false;
     }
 
     // Mark as used
-    $pdo->prepare("UPDATE `otp_codes` SET used_at = NOW() WHERE id = :id")
-        ->execute([':id' => $row['id']]);
+    foreach ($data['codes'] as &$code) {
+        if ($code['id'] === $latest['id']) {
+            $code['used_at'] = date('Y-m-d H:i:s');
+            break;
+        }
+    }
+    unset($code);
 
+    writeJsonFile($filePath, $data);
     return true;
 }

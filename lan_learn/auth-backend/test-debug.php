@@ -2,13 +2,16 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-echo "=== Testing DB Connection ===\n";
+echo "=== Testing JSON Storage ===\n";
 try {
     require_once __DIR__ . '/db.php';
-    $pdo = getLoginDbConnection();
-    echo "DB Connection: OK\n";
+    $dataDir = getDataDir();
+    echo "Data directory: $dataDir\n";
+    echo "Directory exists: " . (is_dir($dataDir) ? 'YES' : 'NO') . "\n";
+    echo "Directory writable: " . (is_writable($dataDir) ? 'YES' : 'NO') . "\n";
+    echo "JSON Storage: OK\n";
 } catch (Throwable $e) {
-    echo "DB Error: " . $e->getMessage() . "\n";
+    echo "Storage Error: " . $e->getMessage() . "\n";
     echo "File: " . $e->getFile() . ":" . $e->getLine() . "\n";
     exit(1);
 }

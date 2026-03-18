@@ -4,68 +4,58 @@ header('Cache-Control: no-store');
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-echo "=== DB Connection Test v2 ===\n\n";
+echo "=== JSON File Storage Test ===\n\n";
+
+require_once __DIR__ . '/db.php';
 
 // Load the config
 $cfg = require __DIR__ . '/db-config.local.php';
 echo "Config loaded:\n";
-echo "  host:     " . ($cfg['host'] ?? 'NOT SET') . "\n";
-echo "  port:     " . ($cfg['port'] ?? 'NOT SET') . "\n";
-echo "  dbname:   " . ($cfg['dbname'] ?? 'NOT SET') . "\n";
-echo "  username: " . ($cfg['username'] ?? 'NOT SET') . "\n";
-echo "  password: " . (isset($cfg['password']) ? str_repeat('*', strlen($cfg['password'])) . ' (' . strlen($cfg['password']) . ' chars)' : 'NOT SET') . "\n\n";
+echo "  driver:   " . ($cfg['driver'] ?? 'NOT SET') . "\n";
+echo "  data_dir: " . ($cfg['data_dir'] ?? 'NOT SET') . "\n\n";
 
-// Test 1: Connect with localhost (Unix socket)
-echo "--- Test 1: localhost (Unix socket) ---\n";
+$dataDir = getDataDir();
+
+// Test 1: Check data directory
+echo "--- Test 1: Data directory ---\n";
+echo "Path: $dataDir\n";
+echo "Exists: " . (is_dir($dataDir) ? 'YES' : 'NO') . "\n";
+echo "Writable: " . (is_writable($dataDir) ? 'YES' : 'NO') . "\n\n";
+
+// Test 2: Write test
+echo "--- Test 2: Write/read test ---\n";
 try {
-    $dsn = "mysql:host=localhost;port=3307;charset=utf8mb4";
-    $pdo = new PDO($dsn, $cfg['username'], $cfg['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 5,
-    ]);
-    echo "CONNECTED OK via localhost\n";
-    $pdo = null;
+    $testFile = $dataDir . '/_test_live.json';
+    writeJsonFile($testFile, ['test' => true, 'time' => date('Y-m-d H:i:s')]);
+    $readBack = readJsonFile($testFile);
+    echo "Write: OK\n";
+    echo "Read back: " . ($readBack['test'] === true ? 'OK' : 'MISMATCH') . "\n";
+    @unlink($testFile);
 } catch (Throwable $e) {
     echo "FAILED: " . $e->getMessage() . "\n";
 }
 
-// Test 2: Connect with 127.0.0.1 (TCP)
-echo "\n--- Test 2: 127.0.0.1 (TCP) ---\n";
-try {
-    $dsn = "mysql:host=127.0.0.1;port=3307;charset=utf8mb4";
-    $pdo = new PDO($dsn, $cfg['username'], $cfg['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 5,
-    ]);
-    echo "CONNECTED OK via 127.0.0.1\n";
-    $pdo = null;
-} catch (Throwable $e) {
-    echo "FAILED: " . $e->getMessage() . "\n";
+// Test 3: List existing data files
+echo "\n--- Test 3: Existing data files ---\n";
+$files = glob($dataDir . '/*.json');
+if (empty($files)) {
+    echo "No data files yet.\n";
+} else {
+    foreach ($files as $f) {
+        $size = filesize($f);
+        echo basename($f) . " ($size bytes)\n";
+    }
 }
 
-// Test 3: Check if database exists (using root-like access)
-echo "\n--- Test 3: Check database existence ---\n";
+// Test 4: Test login audit write
+echo "\n--- Test 4: Login audit write ---\n";
 try {
-    $dsn = "mysql:host=localhost;charset=utf8mb4";
-    $pdo = new PDO($dsn, $cfg['username'], $cfg['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 5,
+    saveLoginAudit([
+        'email' => 'test-live@example.com',
+        'login_method' => 'test',
+        'login_status' => 'success',
     ]);
-    $stmt = $pdo->query("SHOW DATABASES");
-    $dbs = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    echo "Databases visible: " . implode(', ', $dbs) . "\n";
-} catch (Throwable $e) {
-    echo "FAILED: " . $e->getMessage() . "\n";
-}
-
-echo "\n--- Test 4: Connect directly to specific database ---\n";
-try {
-    $dsn = "mysql:host=localhost;dbname=" . $cfg['dbname'] . ";charset=utf8mb4";
-    $pdo = new PDO($dsn, $cfg['username'], $cfg['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 5,
-    ]);
-    echo "CONNECTED to " . $cfg['dbname'] . " OK!\n";
+    echo "Login audit write: OK\n";
 } catch (Throwable $e) {
     echo "FAILED: " . $e->getMessage() . "\n";
 }
