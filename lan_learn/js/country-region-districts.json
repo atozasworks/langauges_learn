@@ -1,0 +1,23 @@
+{
+  "India": {
+    "Karnataka": [
+      "Bangalore",
+      "Mysore",
+      "Dakshina Kannada"
+    ],
+    "Tamil Nadu": [
+      "Chennai",
+      "Coimbatore"
+    ]
+  },
+  "Canada": {
+    "Ontario": [
+      "Toronto",
+      "Ottawa"
+    ],
+    "Quebec": [
+      "Montreal",
+      "Quebec City"
+    ]
+  }
+}

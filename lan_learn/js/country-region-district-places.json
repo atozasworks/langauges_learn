@@ -1,0 +1,19 @@
+{
+  "India": {
+    "Karnataka": {
+      "Bangalore": ["MG Road", "Indiranagar", "Jayanagar", "Whitefield"],
+      "Mysore": ["Vijayanagar", "Nazarbad", "Gokulam"],
+      "Dakshina Kannada": ["Mangalore", "Puttur", "Sullia"]
+    },
+    "Tamil Nadu": {
+      "Chennai": ["T Nagar", "Velachery", "Anna Nagar"],
+      "Coimbatore": ["RS Puram", "Gandhipuram", "Peelamedu"]
+    }
+  },
+  "Canada": {
+    "Ontario": {
+      "Toronto": ["Downtown", "Scarborough", "North York"],
+      "Ottawa": ["Kanata", "Nepean", "Orleans"]
+    }
+  }
+}
