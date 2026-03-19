@@ -247,6 +247,18 @@
     font-size: 0.85rem;
 }
 
+.loc-dropdown-input:disabled {
+    background-color: #0f172a;
+    color: #64748b;
+    border-color: #1f2937;
+    cursor: not-allowed;
+}
+
+.loc-dropdown.is-disabled .loc-dropdown-arrow {
+    color: #475569;
+    cursor: not-allowed;
+}
+
 .loc-dropdown-arrow {
     position: absolute;
     right: 0.5rem;
