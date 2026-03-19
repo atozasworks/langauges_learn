@@ -28,5 +28,11 @@
         "region": "karnataka",
         "district": "DK",
         "place": "sulia"
+    },
+    {
+        "country": "India",
+        "region": "Kerala",
+        "district": "Mysore",
+        "place": "Puttur"
     }
 ]

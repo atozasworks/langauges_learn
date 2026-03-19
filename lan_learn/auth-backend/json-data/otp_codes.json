@@ -38,5 +38,21 @@
         "expires_at": "2026-03-18 12:41:28",
         "used_at": "2026-03-18 12:36:48",
         "created_at": "2026-03-18 12:36:28"
+    },
+    {
+        "id": 6,
+        "email": "chaithradhanduguri@gmail.com",
+        "otp_hash": "$2y$10$MvZzj9OwYHxvf3KRT3O0GOzqWHIvR.eT81\/1E50k3sBHQpbA8uPmm",
+        "expires_at": "2026-03-19 05:57:56",
+        "used_at": "2026-03-19 05:53:42",
+        "created_at": "2026-03-19 05:52:56"
+    },
+    {
+        "id": 7,
+        "email": "vathsalawork48@gmail.com",
+        "otp_hash": "$2y$10$qY5sr4iOfEuQSKB.bNmFHO4vBliYf26zY42JauL.9S35BEY5h7Pbu",
+        "expires_at": "2026-03-19 07:18:49",
+        "used_at": "2026-03-19 07:14:12",
+        "created_at": "2026-03-19 07:13:49"
     }
 ]

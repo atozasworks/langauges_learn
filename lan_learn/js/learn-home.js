@@ -513,6 +513,66 @@ class LearnHome {
         return { countryRegionMap, regionDistrictMap };
     }
 
+    buildLocationMapsFromCscPackage(countries, states, cities) {
+        if (!Array.isArray(countries) || !Array.isArray(states) || !Array.isArray(cities)) {
+            return { countryRegionMap: {}, regionDistrictMap: {} };
+        }
+
+        const countryByCode = new Map();
+        countries.forEach((countryObj) => {
+            const code = (countryObj?.iso2 || '').toString().trim().toUpperCase();
+            const name = (countryObj?.name || '').toString().trim();
+            if (code && name) countryByCode.set(code, name);
+        });
+
+        const regionMapByCountry = {};
+        const regionByCountryStateCode = new Map(); // "CC|SC" => regionName
+        states.forEach((stateObj) => {
+            const countryCode = (stateObj?.countryCode || '').toString().trim().toUpperCase();
+            const regionName = (stateObj?.name || '').toString().trim();
+            const stateCode = (stateObj?.isoCode || '').toString().trim().toUpperCase();
+            const countryName = countryByCode.get(countryCode);
+            if (!countryName || !regionName) return;
+
+            if (!regionMapByCountry[countryName]) regionMapByCountry[countryName] = [];
+            regionMapByCountry[countryName].push(regionName);
+            if (stateCode) {
+                regionByCountryStateCode.set(`${countryCode}|${stateCode}`, regionName);
+            }
+        });
+
+        const districtMapByCountry = {};
+        cities.forEach((cityObj) => {
+            const countryCode = (cityObj?.countryCode || '').toString().trim().toUpperCase();
+            const stateCode = (cityObj?.stateCode || '').toString().trim().toUpperCase();
+            const cityName = (cityObj?.name || '').toString().trim();
+            const countryName = countryByCode.get(countryCode);
+            if (!countryName || !stateCode || !cityName) return;
+
+            const regionName = regionByCountryStateCode.get(`${countryCode}|${stateCode}`);
+            if (!regionName) return;
+
+            if (!districtMapByCountry[countryName]) districtMapByCountry[countryName] = {};
+            if (!districtMapByCountry[countryName][regionName]) districtMapByCountry[countryName][regionName] = [];
+            districtMapByCountry[countryName][regionName].push(cityName);
+        });
+
+        const countryRegionMap = {};
+        Object.entries(regionMapByCountry).forEach(([country, regions]) => {
+            countryRegionMap[country] = this.prepareDropdownValues(regions);
+        });
+
+        const regionDistrictMap = {};
+        Object.entries(districtMapByCountry).forEach(([country, regionMap]) => {
+            regionDistrictMap[country] = {};
+            Object.entries(regionMap).forEach(([region, districts]) => {
+                regionDistrictMap[country][region] = this.prepareDropdownValues(districts);
+            });
+        });
+
+        return { countryRegionMap, regionDistrictMap };
+    }
+
     applyCountryMapAliases(countryMap) {
         const result = { ...(countryMap || {}) };
         const findByCanonical = (canonicalName) => {
@@ -594,6 +654,16 @@ class LearnHome {
         return matchedEntry[1];
     }
 
+    getAllMappedRegions() {
+        const allRegions = [];
+        Object.values(this.countryRegionMap || {}).forEach((regions) => {
+            if (Array.isArray(regions)) {
+                allRegions.push(...regions);
+            }
+        });
+        return this.prepareDropdownValues(allRegions);
+    }
+
     getMappedDistrictsForRegion(country, region) {
         const targetCountry = this.getCanonicalCountryName(country);
         const targetRegion = this.normalizeLocationValue(region);
@@ -614,6 +684,19 @@ class LearnHome {
         }
 
         return matchedRegion[1];
+    }
+
+    getAllMappedDistricts() {
+        const allDistricts = [];
+        Object.values(this.regionDistrictMap || {}).forEach((regionMap) => {
+            if (!regionMap || typeof regionMap !== 'object') return;
+            Object.values(regionMap).forEach((districts) => {
+                if (Array.isArray(districts)) {
+                    allDistricts.push(...districts);
+                }
+            });
+        });
+        return this.prepareDropdownValues(allDistricts);
     }
 
     getMappedPlacesForDistrict(country, region, district) {
@@ -644,6 +727,22 @@ class LearnHome {
         }
 
         return matchedDistrict[1];
+    }
+
+    getAllMappedPlaces() {
+        const allPlaces = [];
+        Object.values(this.districtPlaceMap || {}).forEach((regionMap) => {
+            if (!regionMap || typeof regionMap !== 'object') return;
+            Object.values(regionMap).forEach((districtMap) => {
+                if (!districtMap || typeof districtMap !== 'object') return;
+                Object.values(districtMap).forEach((places) => {
+                    if (Array.isArray(places)) {
+                        allPlaces.push(...places);
+                    }
+                });
+            });
+        });
+        return this.prepareDropdownValues(allPlaces);
     }
 
     onLocationFieldChange(changedField) {
@@ -728,6 +827,21 @@ class LearnHome {
             .then((data) => this.buildLocationMapsFromGlobalDataset(data))
             .catch(async () => {
                 try {
+                    const [countriesRes, statesRes, citiesRes] = await Promise.all([
+                        fetch('https://cdn.jsdelivr.net/npm/country-state-city@3.2.1/lib/country.json', { cache: 'force-cache' }),
+                        fetch('https://cdn.jsdelivr.net/npm/country-state-city@3.2.1/lib/state.json', { cache: 'force-cache' }),
+                        fetch('https://cdn.jsdelivr.net/npm/country-state-city@3.2.1/lib/city.json', { cache: 'force-cache' }),
+                    ]);
+
+                    if (countriesRes.ok && statesRes.ok && citiesRes.ok) {
+                        const [countriesData, statesData, citiesData] = await Promise.all([
+                            countriesRes.json(),
+                            statesRes.json(),
+                            citiesRes.json(),
+                        ]);
+                        return this.buildLocationMapsFromCscPackage(countriesData, statesData, citiesData);
+                    }
+
                     const fallbackRes = await fetch(
                         'https://cdn.jsdelivr.net/gh/dr5hn/countries-states-cities-database@master/countries+states.json',
                         { cache: 'force-cache' }
@@ -810,27 +924,41 @@ class LearnHome {
         const hasRegion = normalizedRegion !== '';
         const hasDistrict = normalizedDistrict !== '';
 
-        // Regions: only load after country is selected.
+        // Regions: always show a combined list from all countries.
         const filteredByCountry = hasCountry
             ? this.allLocations.filter(l => this.normalizeLocationValue(l.country) === normalizedCountry)
             : [];
         const mappedRegions = hasCountry ? this.getMappedRegionsForCountry(loc.country) : [];
         const serverRegions = filteredByCountry.map(l => l.region).filter(Boolean);
-        const regions = this.prepareDropdownValues([...mappedRegions, ...serverRegions]);
+        const allMappedRegions = this.getAllMappedRegions();
+        const allServerRegions = this.allLocations.map(l => l.region).filter(Boolean);
+        const regions = this.prepareDropdownValues([
+            ...allMappedRegions,
+            ...allServerRegions,
+            ...mappedRegions,
+            ...serverRegions,
+        ]);
         this.populateLocDropdown('region', regions);
-        this.setLocationFieldEnabled('region', hasCountry);
+        this.setLocationFieldEnabled('region', regions.length > 0);
 
-        // Districts: only load after region is selected.
+        // Districts: always show a combined list so the dropdown is never empty by default.
         const filteredByRegion = hasRegion
             ? filteredByCountry.filter(l => this.normalizeLocationValue(l.region) === normalizedRegion)
             : [];
         const mappedDistricts = hasRegion ? this.getMappedDistrictsForRegion(loc.country, loc.region) : [];
         const serverDistricts = filteredByRegion.map(l => l.district).filter(Boolean);
-        const districts = this.prepareDropdownValues([...mappedDistricts, ...serverDistricts]);
+        const allMappedDistricts = this.getAllMappedDistricts();
+        const allServerDistricts = this.allLocations.map(l => l.district).filter(Boolean);
+        const districts = this.prepareDropdownValues([
+            ...allMappedDistricts,
+            ...allServerDistricts,
+            ...mappedDistricts,
+            ...serverDistricts,
+        ]);
         this.populateLocDropdown('district', districts);
-        this.setLocationFieldEnabled('district', hasRegion);
+        this.setLocationFieldEnabled('district', districts.length > 0);
 
-        // Places: only load after district is selected.
+        // Places: always show a combined list from all districts.
         const filteredByDistrict = hasDistrict
             ? filteredByRegion.filter(l => this.normalizeLocationValue(l.district) === normalizedDistrict)
             : [];
@@ -838,9 +966,16 @@ class LearnHome {
             ? this.getMappedPlacesForDistrict(loc.country, loc.region, loc.district)
             : [];
         const serverPlaces = filteredByDistrict.map(l => l.place).filter(Boolean);
-        const places = this.prepareDropdownValues([...mappedPlaces, ...serverPlaces]);
+        const allMappedPlaces = this.getAllMappedPlaces();
+        const allServerPlaces = this.allLocations.map(l => l.place).filter(Boolean);
+        const places = this.prepareDropdownValues([
+            ...allMappedPlaces,
+            ...allServerPlaces,
+            ...mappedPlaces,
+            ...serverPlaces,
+        ]);
         this.populateLocDropdown('place', places);
-        this.setLocationFieldEnabled('place', hasDistrict);
+        this.setLocationFieldEnabled('place', places.length > 0);
     }
 
     // ─── Event listeners ────────────────────────────────
