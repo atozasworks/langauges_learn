@@ -142,14 +142,136 @@ class LearnHome {
     }
 
     setupLocationListeners() {
+        this._dropdownState = {};
         const fields = ['country', 'region', 'district', 'place'];
-        fields.forEach(f => {
-            const el = document.getElementById(`location-${f}`);
-            if (el) {
-                el.addEventListener('input', () => this.onLocationFieldChange(f));
-                el.addEventListener('change', () => this.onLocationFieldChange(f));
+        fields.forEach(f => this.setupLocationDropdown(f));
+
+        // Close all dropdowns on outside click
+        document.addEventListener('click', (e) => {
+            fields.forEach(f => {
+                const wrapper = document.getElementById(`loc-dropdown-${f}`);
+                if (wrapper && !wrapper.contains(e.target)) {
+                    this.closeLocDropdown(f);
+                }
+            });
+        });
+    }
+
+    setupLocationDropdown(field) {
+        const input = document.getElementById(`location-${field}`);
+        const list = document.getElementById(`loc-dropdown-list-${field}`);
+        const arrow = document.querySelector(`#loc-dropdown-${field} .loc-dropdown-arrow`);
+        if (!input || !list) return;
+
+        this._dropdownState[field] = { items: [], highlightIdx: -1 };
+
+        // Toggle list on arrow click
+        if (arrow) {
+            arrow.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (list.classList.contains('open')) {
+                    this.closeLocDropdown(field);
+                } else {
+                    this.filterLocDropdown(field, '');
+                    list.classList.add('open');
+                }
+            });
+        }
+
+        // Filter on input
+        input.addEventListener('input', () => {
+            this.filterLocDropdown(field, input.value.trim());
+            list.classList.add('open');
+        });
+
+        // Open on focus
+        input.addEventListener('focus', () => {
+            this.filterLocDropdown(field, input.value.trim());
+            list.classList.add('open');
+        });
+
+        // Keyboard navigation
+        input.addEventListener('keydown', (e) => {
+            const visible = list.querySelectorAll('li:not(.no-match)');
+            const state = this._dropdownState[field];
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                state.highlightIdx = Math.min(state.highlightIdx + 1, visible.length - 1);
+                this.highlightLocDropdownItem(field, visible);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                state.highlightIdx = Math.max(state.highlightIdx - 1, 0);
+                this.highlightLocDropdownItem(field, visible);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (state.highlightIdx >= 0 && visible[state.highlightIdx]) {
+                    this.selectLocDropdownItem(field, visible[state.highlightIdx].textContent);
+                }
+            } else if (e.key === 'Escape') {
+                this.closeLocDropdown(field);
             }
         });
+    }
+
+    populateLocDropdown(field, values) {
+        const state = this._dropdownState[field];
+        if (!state) return;
+        state.items = values.sort();
+        const input = document.getElementById(`location-${field}`);
+        this.filterLocDropdown(field, input?.value?.trim() || '');
+    }
+
+    filterLocDropdown(field, query) {
+        const list = document.getElementById(`loc-dropdown-list-${field}`);
+        const state = this._dropdownState[field];
+        if (!list || !state) return;
+        list.innerHTML = '';
+        state.highlightIdx = -1;
+
+        const lowerQ = query.toLowerCase();
+        const filtered = lowerQ
+            ? state.items.filter(c => c.toLowerCase().includes(lowerQ))
+            : state.items;
+
+        if (filtered.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = `No matching ${field}`;
+            li.className = 'no-match';
+            list.appendChild(li);
+            return;
+        }
+
+        filtered.forEach(c => {
+            const li = document.createElement('li');
+            li.textContent = c;
+            li.setAttribute('role', 'option');
+            li.addEventListener('click', () => this.selectLocDropdownItem(field, c));
+            list.appendChild(li);
+        });
+    }
+
+    highlightLocDropdownItem(field, visibleItems) {
+        const list = document.getElementById(`loc-dropdown-list-${field}`);
+        const state = this._dropdownState[field];
+        if (!list || !state) return;
+        list.querySelectorAll('li').forEach(li => li.classList.remove('highlighted'));
+        if (state.highlightIdx >= 0 && visibleItems[state.highlightIdx]) {
+            visibleItems[state.highlightIdx].classList.add('highlighted');
+            visibleItems[state.highlightIdx].scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    selectLocDropdownItem(field, value) {
+        const input = document.getElementById(`location-${field}`);
+        if (input) input.value = value;
+        this.closeLocDropdown(field);
+        this.onLocationFieldChange(field);
+    }
+
+    closeLocDropdown(field) {
+        const list = document.getElementById(`loc-dropdown-list-${field}`);
+        if (list) list.classList.remove('open');
+        if (this._dropdownState[field]) this._dropdownState[field].highlightIdx = -1;
     }
 
     onLocationFieldChange(changedField) {
@@ -173,14 +295,6 @@ class LearnHome {
         this.currentLocation = newLoc;
         this.saveCurrentLocation();
         this.updateLocationDataLists();
-
-        // Debounce reload learners
-        clearTimeout(this.locationDebounceTimer);
-        this.locationDebounceTimer = setTimeout(() => {
-            if (this.loggedInUser) {
-                this.loadLearnersFromServer();
-            }
-        }, 500);
     }
 
     async loadLocationsFromServer() {
@@ -202,41 +316,31 @@ class LearnHome {
     updateLocationDataLists() {
         const loc = this.currentLocation;
 
-        // Countries: all unique
-        const countries = [...new Set(this.allLocations.map(l => l.country).filter(Boolean))];
-        this.fillDataList('country-list', countries);
+        // Countries: merge world countries list with any user-entered ones from server
+        const serverCountries = this.allLocations.map(l => l.country).filter(Boolean);
+        const allCountries = [...new Set([...LearnHome.WORLD_COUNTRIES, ...serverCountries])];
+        this.populateLocDropdown('country', allCountries);
 
         // Regions: filter by current country
         const filteredByCountry = this.allLocations.filter(l =>
             !loc.country || l.country === loc.country
         );
         const regions = [...new Set(filteredByCountry.map(l => l.region).filter(Boolean))];
-        this.fillDataList('region-list', regions);
+        this.populateLocDropdown('region', regions);
 
         // Districts: filter by country + region
         const filteredByRegion = filteredByCountry.filter(l =>
             !loc.region || l.region === loc.region
         );
         const districts = [...new Set(filteredByRegion.map(l => l.district).filter(Boolean))];
-        this.fillDataList('district-list', districts);
+        this.populateLocDropdown('district', districts);
 
         // Places: filter by country + region + district
         const filteredByDistrict = filteredByRegion.filter(l =>
             !loc.district || l.district === loc.district
         );
         const places = [...new Set(filteredByDistrict.map(l => l.place).filter(Boolean))];
-        this.fillDataList('place-list', places);
-    }
-
-    fillDataList(datalistId, values) {
-        const dl = document.getElementById(datalistId);
-        if (!dl) return;
-        dl.innerHTML = '';
-        values.sort().forEach(v => {
-            const opt = document.createElement('option');
-            opt.value = v;
-            dl.appendChild(opt);
-        });
+        this.populateLocDropdown('place', places);
     }
 
     // ─── Event listeners ────────────────────────────────
@@ -328,8 +432,6 @@ class LearnHome {
         options.forEach((option) => {
             option.addEventListener('mouseenter', () => setHoverMessage(option));
             option.addEventListener('focus', () => setHoverMessage(option));
-            option.addEventListener('mouseleave', () => resetHoverMessage());
-            option.addEventListener('blur', () => resetHoverMessage());
 
             option.addEventListener('click', () => {
                 options.forEach((btn) => btn.classList.remove('is-selected'));
@@ -337,6 +439,16 @@ class LearnHome {
                 const targetPath = option.getAttribute('data-value');
                 if (targetPath) window.location.href = targetPath;
             });
+        });
+
+        menu.addEventListener('mouseleave', () => {
+            resetHoverMessage();
+        });
+
+        menu.addEventListener('focusout', (event) => {
+            if (!menu.contains(event.relatedTarget)) {
+                resetHoverMessage();
+            }
         });
 
         document.addEventListener('click', (e) => {
@@ -464,10 +576,6 @@ class LearnHome {
                 body: JSON.stringify({
                     email: this.loggedInUser.email,
                     learner_id: id,
-                    country: this.currentLocation.country,
-                    region: this.currentLocation.region,
-                    district: this.currentLocation.district,
-                    place: this.currentLocation.place,
                 })
             });
             const data = await res.json();
@@ -638,14 +746,7 @@ class LearnHome {
         if (!this.loggedInUser) return;
 
         try {
-            const params = new URLSearchParams({
-                email: this.loggedInUser.email,
-                country: this.currentLocation.country,
-                region: this.currentLocation.region,
-                district: this.currentLocation.district,
-                place: this.currentLocation.place,
-            });
-            const url = `./auth-backend/get-learners.php?${params.toString()}`;
+            const url = `./auth-backend/get-learners.php?email=${encodeURIComponent(this.loggedInUser.email)}`;
             const res = await fetch(url);
             const data = await res.json();
 
@@ -697,6 +798,33 @@ class LearnHome {
         this.updateCounts();
     }
 }
+
+// Complete list of world countries
+LearnHome.WORLD_COUNTRIES = [
+    "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia",
+    "Australia","Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium",
+    "Belize","Benin","Bhutan","Bolivia","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria",
+    "Burkina Faso","Burundi","Cabo Verde","Cambodia","Cameroon","Canada","Central African Republic","Chad",
+    "Chile","China","Colombia","Comoros","Congo","Costa Rica","Croatia","Cuba","Cyprus","Czech Republic",
+    "Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor",
+    "Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Eswatini","Ethiopia","Fiji",
+    "Finland","France","Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea",
+    "Guinea-Bissau","Guyana","Haiti","Honduras","Hungary","Iceland","India","Indonesia","Iran","Iraq",
+    "Ireland","Israel","Italy","Ivory Coast","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati",
+    "Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein",
+    "Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands",
+    "Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Morocco",
+    "Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Zealand","Nicaragua","Niger",
+    "Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestine","Panama",
+    "Papua New Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania","Russia",
+    "Rwanda","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines","Samoa",
+    "San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone",
+    "Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea",
+    "South Sudan","Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria","Taiwan",
+    "Tajikistan","Tanzania","Thailand","Togo","Tonga","Trinidad and Tobago","Tunisia","Turkey",
+    "Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States",
+    "Uruguay","Uzbekistan","Vanuatu","Vatican City","Venezuela","Vietnam","Yemen","Zambia","Zimbabwe"
+];
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {

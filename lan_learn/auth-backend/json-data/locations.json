@@ -4,5 +4,29 @@
         "region": "karnataka",
         "district": "dakshinakannada",
         "place": "kadaba"
+    },
+    {
+        "country": "india",
+        "region": "karnataka",
+        "district": "DK",
+        "place": "manglore"
+    },
+    {
+        "country": "india",
+        "region": "karnataka",
+        "district": "DK",
+        "place": "bellare"
+    },
+    {
+        "country": "india",
+        "region": "karnataka",
+        "district": "DK",
+        "place": "bengalore"
+    },
+    {
+        "country": "india",
+        "region": "karnataka",
+        "district": "DK",
+        "place": "sulia"
     }
 ]

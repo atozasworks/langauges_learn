@@ -127,23 +127,35 @@
             <div class="location-fields">
               <div class="location-field">
                 <label for="location-country">Country</label>
-                <input type="text" id="location-country" list="country-list" placeholder="Enter Country" autocomplete="off" />
-                <datalist id="country-list"></datalist>
+                <div class="loc-dropdown" id="loc-dropdown-country">
+                  <input type="text" id="location-country" class="loc-dropdown-input" placeholder="Type or select country" autocomplete="off" />
+                  <span class="loc-dropdown-arrow" data-field="country">&#9662;</span>
+                  <ul class="loc-dropdown-list" id="loc-dropdown-list-country" role="listbox"></ul>
+                </div>
               </div>
               <div class="location-field">
                 <label for="location-region">Region / State</label>
-                <input type="text" id="location-region" list="region-list" placeholder="Enter Region/State" autocomplete="off" />
-                <datalist id="region-list"></datalist>
+                <div class="loc-dropdown" id="loc-dropdown-region">
+                  <input type="text" id="location-region" class="loc-dropdown-input" placeholder="Type or select region" autocomplete="off" />
+                  <span class="loc-dropdown-arrow" data-field="region">&#9662;</span>
+                  <ul class="loc-dropdown-list" id="loc-dropdown-list-region" role="listbox"></ul>
+                </div>
               </div>
               <div class="location-field">
                 <label for="location-district">District / Sub-Region</label>
-                <input type="text" id="location-district" list="district-list" placeholder="Enter District/Sub-Region" autocomplete="off" />
-                <datalist id="district-list"></datalist>
+                <div class="loc-dropdown" id="loc-dropdown-district">
+                  <input type="text" id="location-district" class="loc-dropdown-input" placeholder="Type or select district" autocomplete="off" />
+                  <span class="loc-dropdown-arrow" data-field="district">&#9662;</span>
+                  <ul class="loc-dropdown-list" id="loc-dropdown-list-district" role="listbox"></ul>
+                </div>
               </div>
               <div class="location-field">
                 <label for="location-place">Place Name</label>
-                <input type="text" id="location-place" list="place-list" placeholder="Enter Place Name" autocomplete="off" />
-                <datalist id="place-list"></datalist>
+                <div class="loc-dropdown" id="loc-dropdown-place">
+                  <input type="text" id="location-place" class="loc-dropdown-input" placeholder="Type or select place" autocomplete="off" />
+                  <span class="loc-dropdown-arrow" data-field="place">&#9662;</span>
+                  <ul class="loc-dropdown-list" id="loc-dropdown-list-place" role="listbox"></ul>
+                </div>
               </div>
             </div>
           </div>

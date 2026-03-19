@@ -10,7 +10,7 @@ define('JSON_DB_LOADED', true);
  *     login_audit.json     – Login audit log
  *     locations.json       – All entered location combinations
  *     learners/
- *       {country}_{region}_{district}_{place}.json  – Learners per location
+ *       {email_safe}.json  – One file per user (email-based)
  */
 
 error_reporting(E_ALL);
@@ -86,110 +86,89 @@ function writeJsonFile(string $path, array $data): void
 }
 
 /**
- * Sanitize a single location part for use in filenames.
+ * Convert email to a safe filename.
+ * e.g., "user@gmail.com" → "user_gmail.com"
  */
-function sanitizeLocationPart(string $part): string
+function emailToFilename(string $email): string
 {
-    $part = trim($part);
-    // Remove filesystem-unsafe characters
-    $part = preg_replace('/[\/\\\\:*?"<>|]/', '', $part);
-    // Replace multiple spaces with single space
-    $part = preg_replace('/\s+/', ' ', $part);
-    return $part;
+    $email = strtolower(trim($email));
+    // Replace @ with underscore, remove filesystem-unsafe chars
+    $safe = str_replace('@', '_', $email);
+    $safe = preg_replace('/[\/\\\\:*?"<>|]/', '', $safe);
+    return $safe;
 }
 
 /**
- * Build a location-based filename key from location array.
- * Empty fields result in empty segments: "India___Whitefield"
+ * Get the path to a learner JSON file for a specific user (email-based).
  */
-function buildLocationKey(array $location): string
-{
-    $country  = sanitizeLocationPart($location['country']  ?? '');
-    $region   = sanitizeLocationPart($location['region']   ?? '');
-    $district = sanitizeLocationPart($location['district'] ?? '');
-    $place    = sanitizeLocationPart($location['place']    ?? '');
-
-    $key = $country . '_' . $region . '_' . $district . '_' . $place;
-
-    // If all empty, use a default key
-    if ($key === '___') {
-        $key = '_default';
-    }
-
-    return $key;
-}
-
-/**
- * Get the path to a learner JSON file for a specific location.
- */
-function getLearnerFilePath(array $location): string
+function getLearnerFilePath(string $email): string
 {
     ensureJsonDataDirs();
-    $key = buildLocationKey($location);
-    return getJsonDataDir() . '/learners/' . $key . '.json';
+    $filename = emailToFilename($email);
+    return getJsonDataDir() . '/learners/' . $filename . '.json';
 }
 
 /* ────────────────────────────────────────────
    Learning Team helpers — JSON file-based
+   One file per user email. Each learner entry
+   stores its own location data inside the file.
    ──────────────────────────────────────────── */
 
 /**
- * Get all learners for a specific user at a given location.
+ * Get all learners for a specific user.
  */
 function getLearnersByUser(string $email, array $location = []): array
 {
-    $filePath = getLearnerFilePath($location);
-    $allData  = readJsonFile($filePath);
-    $userLearners = $allData[$email] ?? [];
+    $filePath = getLearnerFilePath($email);
+    $allLearners = readJsonFile($filePath);
 
     return array_map(function ($l) {
         return [
             'id'           => $l['id'],
             'learner_name' => $l['learner_name'],
         ];
-    }, $userLearners);
+    }, $allLearners);
 }
 
 /**
- * Add a learner to a user's team at a given location. Returns the new row id.
+ * Add a learner to a user's file. Returns the new row id.
  */
 function addLearner(string $email, string $name, array $location = []): int
 {
-    $filePath = getLearnerFilePath($location);
-    $allData  = readJsonFile($filePath);
+    $filePath    = getLearnerFilePath($email);
+    $allLearners = readJsonFile($filePath);
 
-    if (!isset($allData[$email])) {
-        $allData[$email] = [];
-    }
-
-    // Check for duplicate
-    foreach ($allData[$email] as $l) {
-        if (strtolower($l['learner_name']) === strtolower($name)) {
+    // Check for duplicate name (same name + same location)
+    foreach ($allLearners as $l) {
+        if (strtolower($l['learner_name']) === strtolower($name) &&
+            ($l['country']  ?? '') === ($location['country']  ?? '') &&
+            ($l['region']   ?? '') === ($location['region']   ?? '') &&
+            ($l['district'] ?? '') === ($location['district'] ?? '') &&
+            ($l['place']    ?? '') === ($location['place']    ?? '')) {
             throw new RuntimeException('DUPLICATE_ENTRY');
         }
     }
 
-    // Generate next ID (global across all users in this file)
+    // Generate next ID
     $maxId = 0;
-    foreach ($allData as $userEmail => $userLearners) {
-        if ($userEmail === '_meta') {
-            continue;
-        }
-        foreach ($userLearners as $l) {
-            if (($l['id'] ?? 0) > $maxId) {
-                $maxId = $l['id'];
-            }
+    foreach ($allLearners as $l) {
+        if (($l['id'] ?? 0) > $maxId) {
+            $maxId = $l['id'];
         }
     }
     $newId = $maxId + 1;
 
-    $allData[$email][] = [
+    $allLearners[] = [
         'id'           => $newId,
         'learner_name' => $name,
+        'country'      => $location['country']  ?? '',
+        'region'       => $location['region']   ?? '',
+        'district'     => $location['district'] ?? '',
+        'place'        => $location['place']    ?? '',
         'created_at'   => date('Y-m-d H:i:s'),
     ];
 
-    writeJsonFile($filePath, $allData);
+    writeJsonFile($filePath, $allLearners);
 
     // Also update locations.json with this location combo
     updateLocationsIndex($location);
@@ -198,19 +177,15 @@ function addLearner(string $email, string $name, array $location = []): int
 }
 
 /**
- * Delete a learner from a user's team (only if it belongs to that user).
+ * Delete a learner from a user's file (by ID).
  */
 function deleteLearner(string $email, int $learnerId, array $location = []): bool
 {
-    $filePath = getLearnerFilePath($location);
-    $allData  = readJsonFile($filePath);
-
-    if (!isset($allData[$email])) {
-        return false;
-    }
+    $filePath    = getLearnerFilePath($email);
+    $allLearners = readJsonFile($filePath);
 
     $found = false;
-    $allData[$email] = array_values(array_filter($allData[$email], function ($l) use ($learnerId, &$found) {
+    $allLearners = array_values(array_filter($allLearners, function ($l) use ($learnerId, &$found) {
         if ($l['id'] === $learnerId) {
             $found = true;
             return false;
@@ -222,12 +197,7 @@ function deleteLearner(string $email, int $learnerId, array $location = []): boo
         return false;
     }
 
-    // Clean up empty user entries
-    if (empty($allData[$email])) {
-        unset($allData[$email]);
-    }
-
-    writeJsonFile($filePath, $allData);
+    writeJsonFile($filePath, $allLearners);
     return true;
 }
 
