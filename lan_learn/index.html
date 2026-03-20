@@ -32,6 +32,12 @@
     <!-- jQuery and DataTables JS -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <meta
+      name="google-signin-client_id"
+      content="93874556237-11b6e67holgt1ich12uo2ij7eltqlc1h.apps.googleusercontent.com"
+    />
+    <meta name="auth-api-base" content="http://localhost:4000" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <!-- Navigation -->
@@ -59,6 +65,12 @@
             <option value="en" selected>🌐 English</option>
           </select>
         </div>
+        <button id="open-login-panel-btn" class="auth-trigger-btn" type="button">
+          Login
+        </button>
+        <button id="logout-btn" class="auth-trigger-btn auth-logout-btn" type="button" hidden>
+          Logout
+        </button>
       </div>
     </nav>
 
@@ -370,6 +382,38 @@
       </div>
     </div>
 
+    <!-- Right-side Auth Panel -->
+    <div id="auth-panel-overlay" class="auth-panel-overlay"></div>
+    <aside id="auth-panel" class="auth-panel" aria-hidden="true">
+      <div class="auth-panel-header">
+        <h3>Login to Continue</h3>
+        <button id="close-login-panel-btn" class="auth-close-btn" type="button" aria-label="Close login panel">
+          ×
+        </button>
+      </div>
+
+      <div class="auth-panel-content">
+        <label for="auth-email" class="auth-label">Email</label>
+        <input id="auth-email" type="email" class="auth-input" placeholder="you@example.com" />
+
+        <button id="send-otp-btn" type="button" class="auth-btn auth-btn-primary">
+          Send OTP
+        </button>
+
+        <label for="auth-otp" class="auth-label">Enter OTP</label>
+        <input id="auth-otp" type="text" maxlength="6" class="auth-input" placeholder="6-digit OTP" />
+
+        <button id="verify-otp-btn" type="button" class="auth-btn auth-btn-success">
+          Verify OTP
+        </button>
+
+        <div class="auth-divider">or continue with Google</div>
+        <div id="google-signin-btn" class="google-signin-wrap"></div>
+
+        <p id="auth-status" class="auth-status" aria-live="polite"></p>
+      </div>
+    </aside>
+
     <!-- Popup Modals -->
     <div id="warning-popup" class="popup-overlay">
       <div class="popup-content">
@@ -427,5 +471,6 @@
     <script src="js/dialogue.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/pwa-install.js"></script>
+    <script src="js/auth-login.js"></script>
   </body>
 </html>
