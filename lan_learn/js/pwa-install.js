@@ -285,26 +285,40 @@ if (document.readyState === 'loading') {
 
 // Register service worker
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        // Try both relative paths for flexibility
-        const swPath = './sw.js';
-        navigator.serviceWorker.register(swPath)
-            .then((registration) => {
-                console.log('ServiceWorker registration successful:', registration.scope);
-                // Check for updates
-                registration.update();
-            })
-            .catch((error) => {
-                console.log('ServiceWorker registration failed:', error);
-                // Try absolute path as fallback
-                navigator.serviceWorker.register('/sw.js')
-                    .then((registration) => {
-                        console.log('ServiceWorker registration successful (absolute path):', registration.scope);
-                    })
-                    .catch((err) => {
-                        console.log('ServiceWorker registration failed (both paths):', err);
-                    });
+    window.addEventListener('load', async () => {
+        try {
+            const swVersion = 'v3';
+            const registration = await navigator.serviceWorker.register(`./sw.js?${swVersion}`, { scope: './' });
+            console.log('ServiceWorker registration successful:', registration.scope);
+
+            // If an updated SW is waiting, activate it immediately.
+            if (registration.waiting) {
+                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+
+            registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                if (!newWorker) return;
+
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        newWorker.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                });
             });
+
+            let reloaded = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (reloaded) return;
+                reloaded = true;
+                // Load fresh assets once the new SW takes control.
+                window.location.reload();
+            });
+
+            registration.update();
+        } catch (error) {
+            console.log('ServiceWorker registration failed:', error);
+        }
     });
 }
 

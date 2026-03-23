@@ -148,6 +148,9 @@ class GTongueLearnApp {
 
         // Handle go back buttons
         document.getElementById('go-back-btn')?.addEventListener('click', () => {
+            if (window.dialoguePage && typeof window.dialoguePage.stopAutoPlay === 'function') {
+                window.dialoguePage.stopAutoPlay();
+            }
             this.showPage('home');
         });
 
@@ -156,6 +159,9 @@ class GTongueLearnApp {
         });
 
         document.getElementById('opensource-back-btn')?.addEventListener('click', () => {
+            if (window.dialoguePage && typeof window.dialoguePage.stopAutoPlay === 'function') {
+                window.dialoguePage.stopAutoPlay();
+            }
             this.showPage('home');
         });
 

@@ -1,0 +1,12 @@
+[Mon Mar 23 09:18:54 2026] PHP 8.0.30 Development Server (http://127.0.0.1:8000) started
+[Mon Mar 23 09:18:55 2026] 127.0.0.1:51317 Accepted
+[Mon Mar 23 09:18:55 2026] 127.0.0.1:59455 Accepted
+[Mon Mar 23 09:18:55 2026] PHP Warning:  session_start(): open(C:\xampp\tmp\sess_sh0nno5c5pomclqa256m7m7r4j, O_RDWR) failed: Permission denied (13) in C:\001work\lan_learn20032026_01\auth\bootstrap.php on line 8
+[Mon Mar 23 09:18:55 2026] PHP Warning:  session_start(): Failed to read session data: files (path: C:\xampp\tmp) in C:\001work\lan_learn20032026_01\auth\bootstrap.php on line 8
+[Mon Mar 23 09:18:55 2026] 127.0.0.1:51317 [200]: GET /login.php
+[Mon Mar 23 09:18:55 2026] 127.0.0.1:51317 Closing
+[Mon Mar 23 09:18:55 2026] 127.0.0.1:59455 [200]: GET /styles/auth.css
+[Mon Mar 23 09:18:55 2026] 127.0.0.1:59455 Closing
+[Mon Mar 23 09:18:55 2026] 127.0.0.1:62197 Accepted
+[Mon Mar 23 09:18:55 2026] 127.0.0.1:62197 [404]: GET /favicon.ico - No such file or directory
+[Mon Mar 23 09:18:55 2026] 127.0.0.1:62197 Closing

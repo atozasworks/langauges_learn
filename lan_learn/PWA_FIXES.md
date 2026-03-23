@@ -38,7 +38,7 @@
 
 ## Testing Checklist
 
-- [ ] Open https://ulsaapp.online/ in Chrome/Edge
+- [ ] Open https://.online/ in Chrome/Edge
 - [ ] Check browser console for service worker registration
 - [ ] Verify install popup appears (within 1-4 seconds)
 - [ ] Click "Install App" and verify browser prompt appears

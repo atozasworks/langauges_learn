@@ -8,6 +8,9 @@ class DialoguePage {
         this.currentLineIndex = -1;
         this.isLoading = false;
         this.currentLanguage = 'English';
+        this.isAutoPlaying = false;
+        this.autoPlayTimer = null;
+        this.autoPlayDelay = 1500;
         this.init();
     }
 
@@ -46,9 +49,35 @@ class DialoguePage {
         if (nextLineBtn) {
             nextLineBtn.addEventListener('click', () => this.nextLine());
         }
+
+        // Auto play controls
+        const stopAutoBtn = document.getElementById('stop-auto-btn');
+        const resumeAutoBtn = document.getElementById('resume-auto-btn');
+        const speedSlider = document.getElementById('speed-slider');
+
+        if (stopAutoBtn) {
+            stopAutoBtn.addEventListener('click', () => this.stopAutoPlay());
+        }
+
+        if (resumeAutoBtn) {
+            resumeAutoBtn.addEventListener('click', () => this.resumeAutoPlay());
+        }
+
+        if (speedSlider) {
+            speedSlider.addEventListener('input', (e) => {
+                const speed = parseInt(e.target.value, 10);
+                this.setAutoPlayDelay(speed);
+            });
+            this.setAutoPlayDelay(parseInt(speedSlider.value, 10));
+        } else {
+            this.updateSpeedLabel();
+        }
+
+        this.updateAutoPlayControlState();
     }
 
     async initializeWithLearners(learnerNames) {
+        this.stopAutoPlay();
         this.learnerNames = learnerNames || [];
         if (this.learnerNames.length === 0) {
             this.showError('No learners selected. Please go back and select learners.');
@@ -56,6 +85,7 @@ class DialoguePage {
         }
 
         await this.loadDialogue();
+        this.startAutoPlay();
     }
 
     async loadDialogue() {
@@ -266,6 +296,96 @@ class DialoguePage {
         this.updateNavigationButtons();
     }
 
+    setAutoPlayDelay(delayMs) {
+        const parsed = Number.isFinite(delayMs) ? delayMs : 1500;
+        this.autoPlayDelay = Math.min(3000, Math.max(500, parsed));
+        this.updateSpeedLabel();
+    }
+
+    updateSpeedLabel() {
+        const speedValue = document.getElementById('speed-value');
+        if (speedValue) {
+            speedValue.textContent = `${(this.autoPlayDelay / 1000).toFixed(1)}s`;
+        }
+    }
+
+    updateAutoPlayControlState() {
+        const stopAutoBtn = document.getElementById('stop-auto-btn');
+        const resumeAutoBtn = document.getElementById('resume-auto-btn');
+
+        if (stopAutoBtn) {
+            stopAutoBtn.disabled = !this.isAutoPlaying;
+        }
+
+        if (resumeAutoBtn) {
+            resumeAutoBtn.disabled = this.isAutoPlaying || this.modifiedDialogue.length === 0;
+        }
+    }
+
+    clearAutoPlayTimer() {
+        if (this.autoPlayTimer) {
+            clearTimeout(this.autoPlayTimer);
+            this.autoPlayTimer = null;
+        }
+    }
+
+    startAutoPlay() {
+        if (this.modifiedDialogue.length === 0) return;
+        this.clearAutoPlayTimer();
+        this.isAutoPlaying = true;
+        this.updateAutoPlayControlState();
+        this.scheduleNextAutoStep();
+    }
+
+    stopAutoPlay() {
+        this.clearAutoPlayTimer();
+        this.isAutoPlaying = false;
+        this.updateAutoPlayControlState();
+    }
+
+    resumeAutoPlay() {
+        if (this.modifiedDialogue.length === 0 || this.isAutoPlaying) {
+            return;
+        }
+        this.startAutoPlay();
+    }
+
+    scheduleNextAutoStep() {
+        this.clearAutoPlayTimer();
+        this.autoPlayTimer = setTimeout(() => {
+            this.autoPlayStep();
+        }, this.autoPlayDelay);
+    }
+
+    autoPlayStep() {
+        if (!this.isAutoPlaying || this.modifiedDialogue.length === 0) {
+            return;
+        }
+
+        const conversation = this.modifiedDialogue[this.currentConversationIndex];
+        const lines = conversation.split('\n');
+        const isLastLine = this.currentLineIndex >= lines.length - 1;
+        const isLastConversation = this.currentConversationIndex >= this.modifiedDialogue.length - 1;
+
+        if (isLastLine) {
+            if (isLastConversation) {
+                this.stopAutoPlay();
+                if (typeof Utils !== 'undefined' && Utils.showToast) {
+                    Utils.showToast('All conversations completed.', 'success');
+                }
+                return;
+            }
+
+            this.setCurrentConversation(this.currentConversationIndex + 1);
+        } else {
+            this.nextLine();
+        }
+
+        if (this.isAutoPlaying) {
+            this.scheduleNextAutoStep();
+        }
+    }
+
     displayConversation() {
         const scriptText = document.getElementById('script-text');
         if (!scriptText || this.currentConversationIndex >= this.modifiedDialogue.length) {
@@ -345,13 +465,18 @@ class DialoguePage {
     }
 
     scrollToHighlightedLine() {
+        const container = document.querySelector('.conversation-block');
         const highlightedLine = document.getElementById('highlighted-line');
-        if (highlightedLine) {
-            highlightedLine.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center'
-            });
+        if (!container || !highlightedLine) {
+            return;
         }
+
+        // Scroll only inside the dialogue container (never the full page).
+        const targetTop = highlightedLine.offsetTop - (container.clientHeight / 2) + (highlightedLine.clientHeight / 2);
+        container.scrollTo({
+            top: Math.max(0, targetTop),
+            behavior: 'smooth'
+        });
     }
 
     updateNavigationButtons() {
@@ -388,6 +513,7 @@ class DialoguePage {
         if (scriptText) {
             if (loading) {
                 scriptText.innerHTML = '<div class="loading">Loading dialogue...</div>';
+                this.stopAutoPlay();
             }
         }
     }
