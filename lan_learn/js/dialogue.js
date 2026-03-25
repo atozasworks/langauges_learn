@@ -6,8 +6,17 @@ class DialoguePage {
         this.learnerNames = [];
         this.currentConversationIndex = 0;
         this.currentLineIndex = -1;
+        this.currentLevel = '';
         this.isLoading = false;
         this.currentLanguage = 'English';
+        this.allDialogue = [];
+        this.levelConfig = {
+            beginner: { label: 'Beginner', file: 'data/Beginner.json' },
+            medium: { label: 'Medium', file: 'data/Medium.json' },
+            expert: { label: 'Expert', file: 'data/Expert.json' }
+        };
+        this.levelConversations = [];
+        this.filteredConversationIndexes = [];
         this.isAutoPlaying = false;
         this.autoPlayTimer = null;
         this.autoPlayDelay = 1500;
@@ -20,6 +29,13 @@ class DialoguePage {
     }
 
     setupEventListeners() {
+        const levelSelector = document.getElementById('level-selector');
+        if (levelSelector) {
+            levelSelector.addEventListener('change', async (e) => {
+                await this.setCurrentLevel(e.target.value);
+            });
+        }
+
         // Conversation selector
         const conversationSelector = document.getElementById('conversation-selector');
         if (conversationSelector) {
@@ -27,6 +43,7 @@ class DialoguePage {
                 this.setCurrentConversation(parseInt(e.target.value));
             });
         }
+        this.setupConversationDropdown();
 
         // Navigation buttons
         const prevConversationBtn = document.getElementById('prev-conversation-btn');
@@ -92,29 +109,15 @@ class DialoguePage {
         this.setLoading(true);
         
         try {
-            // Use embedded dialogue data instead of fetching files
-            if (typeof getDialogueForLanguage === 'undefined') {
-                throw new Error('Dialogue data not loaded. Please ensure dialogue-data.js is included.');
-            }
-            
-            const dialogueText = getDialogueForLanguage(this.currentLanguage);
-            
-            if (!dialogueText || dialogueText.trim() === '') {
-                throw new Error(`No dialogue content found for language: ${this.currentLanguage}`);
-            }
-
-            this.originalDialogue = dialogueText;
-            
-            // Apply translation if needed
             await this.applyTranslation();
-            
-            this.processDialogue();
+            this.populateLevelSelector();
+            await this.setCurrentLevel('');
             this.populateConversationSelector();
-            this.setCurrentConversation(0);
+            this.showInfo('Please select a level and conversation to begin.');
             
         } catch (error) {
             console.error('Error loading dialogue:', error);
-            this.showError(`Failed to load dialogue script for ${this.currentLanguage}. Available languages: ${getAvailableLanguages().join(', ')}`);
+            this.showError(`Failed to initialize dialogue page for ${this.currentLanguage}.`);
             
             // Navigate back to home after a delay
             setTimeout(() => {
@@ -178,7 +181,8 @@ class DialoguePage {
         const modifiedText = this.replaceAllBeforeColonWithLearners(this.originalDialogue, this.learnerNames);
         
         // Split into conversations
-        this.modifiedDialogue = this.splitIntoConversations(modifiedText);
+        this.allDialogue = this.splitIntoConversations(modifiedText);
+        this.modifiedDialogue = [];
     }
 
     replaceAllBeforeColonWithLearners(text, learners) {
@@ -258,21 +262,142 @@ class DialoguePage {
         return conversations.filter(conv => conv.trim() !== '');
     }
 
+    populateLevelSelector() {
+        const levelSelector = document.getElementById('level-selector');
+        if (!levelSelector) return;
+
+        const preferredOrder = ['beginner', 'medium', 'expert'];
+        const levelKeys = preferredOrder.filter((key) => this.levelConfig[key]).concat(
+            Object.keys(this.levelConfig).filter((key) => !preferredOrder.includes(key))
+        );
+
+        levelSelector.innerHTML = '<option value="">Select Level</option>';
+        levelKeys.forEach((levelKey) => {
+            const option = document.createElement('option');
+            option.value = levelKey;
+            option.textContent = this.levelConfig[levelKey].label || levelKey;
+            levelSelector.appendChild(option);
+        });
+    }
+
+    async setCurrentLevel(levelKey) {
+        this.currentLevel = levelKey || '';
+        this.levelConversations = [];
+
+        const levelSelector = document.getElementById('level-selector');
+        if (levelSelector) {
+            levelSelector.value = this.currentLevel;
+        }
+
+        if (!this.currentLevel || !this.levelConfig[this.currentLevel]) {
+            this.modifiedDialogue = [];
+            this.currentConversationIndex = 0;
+            this.currentLineIndex = -1;
+            this.populateConversationSelector();
+            this.showInfo('Please select a level and conversation to begin.');
+            this.stopAutoPlay();
+            return;
+        }
+
+        try {
+            const rawConversations = await this.loadConversationsForLevel(this.currentLevel);
+            this.levelConversations = rawConversations;
+            this.modifiedDialogue = rawConversations.map((conversation) => this.renderConversationWithLearners(conversation));
+        } catch (error) {
+            console.error(`Failed to load ${this.currentLevel} data:`, error);
+            this.modifiedDialogue = [];
+            this.levelConversations = [];
+            this.populateConversationSelector();
+            this.showError(`Unable to load ${this.currentLevel} conversations.`);
+            this.stopAutoPlay();
+            return;
+        }
+
+        this.currentConversationIndex = 0;
+        this.currentLineIndex = -1;
+        this.populateConversationSelector();
+        this.showInfo(`Loaded ${this.modifiedDialogue.length} ${this.levelConfig[this.currentLevel].label} conversations. Select one from the dropdown.`);
+        this.stopAutoPlay();
+    }
+
+    async loadConversationsForLevel(levelKey) {
+        const definition = this.levelConfig[levelKey];
+        if (!definition || !definition.file) {
+            return [];
+        }
+
+        const response = await fetch(definition.file, { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        if (!payload || !Array.isArray(payload.conversations)) {
+            throw new Error('Invalid JSON structure. Expected { conversations: [] }.');
+        }
+
+        return payload.conversations;
+    }
+
+    renderConversationWithLearners(conversation) {
+        const lines = [];
+        const number = conversation?.conversation_number || '';
+        const title = conversation?.title || '';
+
+        if (number) {
+            lines.push(`Conversation ${number}`);
+        }
+
+        if (title) {
+            lines.push(title);
+        }
+
+        const dialogues = Array.isArray(conversation?.dialogues) ? conversation.dialogues : [];
+        dialogues.forEach((item) => {
+            const speaker = (item?.speaker || '').trim();
+            const text = (item?.text || '').trim();
+            if (!speaker && !text) {
+                return;
+            }
+            lines.push(`${speaker || 'Person'}: ${text}`);
+        });
+
+        const baseText = lines.join('\n');
+        return this.replaceAllBeforeColonWithLearners(baseText, this.learnerNames);
+    }
+
     populateConversationSelector() {
         const selector = document.getElementById('conversation-selector');
         if (!selector) return;
 
-        selector.innerHTML = '';
-        
+        selector.innerHTML = '<option value="">Select Conversation</option>';
+        selector.disabled = this.modifiedDialogue.length === 0;
+
         this.modifiedDialogue.forEach((conversation, index) => {
             const option = document.createElement('option');
             option.value = index;
-            option.textContent = `Conversation ${index + 1}`;
+            option.textContent = this.getConversationLabel(index);
             selector.appendChild(option);
         });
+
+        const toggle = document.getElementById('conversation-toggle');
+        const search = document.getElementById('conversation-search');
+        if (toggle) {
+            toggle.disabled = this.modifiedDialogue.length === 0;
+            toggle.textContent = 'Select Conversation';
+        }
+        if (search) {
+            search.value = '';
+        }
+        this.renderConversationList('');
+        this.closeConversationMenu();
     }
 
     setCurrentConversation(index) {
+        if (!Number.isInteger(index)) {
+            return;
+        }
+
         if (index < 0 || index >= this.modifiedDialogue.length) {
             return;
         }
@@ -285,6 +410,11 @@ class DialoguePage {
         if (selector) {
             selector.value = index;
         }
+        const toggle = document.getElementById('conversation-toggle');
+        if (toggle) {
+            toggle.textContent = this.getConversationLabel(index);
+        }
+        this.closeConversationMenu();
 
         // Display the conversation
         this.displayConversation();
@@ -294,6 +424,111 @@ class DialoguePage {
         
         // Update navigation buttons
         this.updateNavigationButtons();
+    }
+
+    getConversationLabel(index) {
+        const meta = this.levelConversations[index] || {};
+        const convNo = meta.conversation_number || index + 1;
+        const title = (meta.title || '').trim();
+        return title ? `Conversation ${convNo} - ${title}` : `Conversation ${convNo}`;
+    }
+
+    setupConversationDropdown() {
+        const container = document.getElementById('conversation-custom');
+        const toggle = document.getElementById('conversation-toggle');
+        const menu = document.getElementById('conversation-menu');
+        const search = document.getElementById('conversation-search');
+
+        if (!container || !toggle || !menu) {
+            return;
+        }
+
+        toggle.addEventListener('click', () => {
+            if (toggle.disabled) return;
+            if (menu.hidden) {
+                this.openConversationMenu();
+            } else {
+                this.closeConversationMenu();
+            }
+        });
+
+        if (search) {
+            search.addEventListener('input', (e) => {
+                this.renderConversationList((e.target.value || '').trim());
+            });
+            search.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    this.closeConversationMenu();
+                    toggle.focus();
+                }
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!container.contains(e.target)) {
+                this.closeConversationMenu();
+            }
+        });
+    }
+
+    openConversationMenu() {
+        const toggle = document.getElementById('conversation-toggle');
+        const menu = document.getElementById('conversation-menu');
+        const search = document.getElementById('conversation-search');
+        if (!toggle || !menu || toggle.disabled) return;
+
+        menu.hidden = false;
+        toggle.setAttribute('aria-expanded', 'true');
+        this.renderConversationList((search?.value || '').trim());
+        if (search) {
+            setTimeout(() => search.focus(), 0);
+        }
+    }
+
+    closeConversationMenu() {
+        const toggle = document.getElementById('conversation-toggle');
+        const menu = document.getElementById('conversation-menu');
+        if (!toggle || !menu) return;
+
+        menu.hidden = true;
+        toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    renderConversationList(filterText) {
+        const list = document.getElementById('conversation-list');
+        if (!list) return;
+
+        list.innerHTML = '';
+        const normalizedFilter = (filterText || '').toLowerCase();
+        this.filteredConversationIndexes = [];
+
+        this.modifiedDialogue.forEach((_, index) => {
+            const label = this.getConversationLabel(index);
+            if (normalizedFilter && !label.toLowerCase().includes(normalizedFilter)) {
+                return;
+            }
+            this.filteredConversationIndexes.push(index);
+
+            const item = document.createElement('li');
+            item.className = 'conversation-item';
+            if (index === this.currentConversationIndex) {
+                item.classList.add('active');
+            }
+            item.textContent = label;
+            item.setAttribute('role', 'option');
+            item.setAttribute('aria-selected', index === this.currentConversationIndex ? 'true' : 'false');
+            item.addEventListener('click', () => {
+                this.setCurrentConversation(index);
+            });
+            list.appendChild(item);
+        });
+
+        if (this.filteredConversationIndexes.length === 0) {
+            const empty = document.createElement('li');
+            empty.className = 'conversation-item empty';
+            empty.textContent = 'No conversations found';
+            list.appendChild(empty);
+        }
     }
 
     setAutoPlayDelay(delayMs) {
@@ -528,6 +763,17 @@ class DialoguePage {
                     <p style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
                         Redirecting to home page in 5 seconds...
                     </p>
+                </div>
+            `;
+        }
+    }
+
+    showInfo(message) {
+        const scriptText = document.getElementById('script-text');
+        if (scriptText) {
+            scriptText.innerHTML = `
+                <div style="text-align: center; color: #374151; padding: 2rem;">
+                    <p>${message}</p>
                 </div>
             `;
         }

@@ -1,0 +1,34 @@
+{
+  "levels": {
+    "beginner": {
+      "label": "Beginner",
+      "conversations": [
+        {
+          "type": "range",
+          "start": 1,
+          "end": 100
+        }
+      ]
+    },
+    "medium": {
+      "label": "Medium",
+      "conversations": [
+        {
+          "type": "range",
+          "start": 101,
+          "end": 250
+        }
+      ]
+    },
+    "expert": { 
+      "label": "Expert",
+      "conversations": [
+        {
+          "type": "range",
+          "start": 251,
+          "end": 10000
+        }
+      ]
+    }
+  }
+}

@@ -122,6 +122,7 @@
     border-radius: 0.5rem;
     padding: 1rem;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    overflow-x: auto;
 }
 
 /* DataTables Customization */
@@ -201,6 +202,11 @@ input[type="checkbox"] {
         width: 100%;
     }
 
+    #add-learner-btn,
+    #start-learning-btn {
+        min-height: 44px;
+    }
+
     .attendance-summary {
         flex-direction: column;
         align-items: center;
@@ -223,6 +229,10 @@ input[type="checkbox"] {
 
     .home-container {
         padding: 0.5em;
+    }
+
+    .input-container {
+        grid-template-columns: 1fr;
     }
 
     #learners-table th,

@@ -146,10 +146,41 @@
             Language Learning - <span id="current-language">English</span>
           </h1>
 
-          <!-- Conversation Selector -->
-          <select class="conversation-selector" id="conversation-selector">
-            <option value="0">Select Conversation</option>
-          </select>
+          <div class="dialogue-selectors">
+            <select class="conversation-selector level-selector" id="level-selector">
+              <option value="">Select Level</option>
+              <option value="beginner">Beginner</option>
+              <option value="medium">Medium</option>
+              <option value="expert">Expert</option>
+            </select>
+
+            <div class="conversation-custom" id="conversation-custom">
+              <button
+                type="button"
+                class="conversation-selector conversation-toggle"
+                id="conversation-toggle"
+                disabled
+                aria-expanded="false"
+                aria-haspopup="listbox"
+              >
+                Select Conversation
+              </button>
+              <div class="conversation-menu" id="conversation-menu" hidden>
+                <input
+                  type="text"
+                  id="conversation-search"
+                  class="conversation-search"
+                  placeholder="Search conversation..."
+                  autocomplete="off"
+                />
+                <ul class="conversation-list" id="conversation-list" role="listbox"></ul>
+              </div>
+            </div>
+
+            <select class="conversation-selector conversation-selector-native" id="conversation-selector" disabled aria-hidden="true" tabindex="-1">
+              <option value="">Select Conversation</option>
+            </select>
+          </div>
 
           <div class="auto-controls">
             <button id="stop-auto-btn" class="auto-btn stop-btn" type="button">Stop</button>

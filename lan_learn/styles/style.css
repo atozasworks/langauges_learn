@@ -14,6 +14,15 @@ body {
     background-color: #f5f5f5;
     color: #333;
     line-height: 1.6;
+    overflow-x: hidden;
+}
+
+img,
+video,
+canvas,
+svg {
+    max-width: 100%;
+    height: auto;
 }
 
 .container {
@@ -45,6 +54,7 @@ body {
     display: flex;
     gap: 2rem;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .nav-link {
@@ -358,15 +368,35 @@ button:disabled {
 @media (max-width: 768px) {
     .navbar {
         padding: 1rem;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .nav-brand {
+        text-align: center;
     }
     
     .nav-links {
         gap: 1rem;
+        width: 100%;
+        justify-content: center;
     }
     
     .nav-link {
         padding: 0.25rem 0.5rem;
         font-size: 0.9rem;
+    }
+
+    .language-selector,
+    #auth-nav-slot {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+
+    .language-dropdown {
+        width: min(100%, 260px);
     }
     
     .page {
@@ -385,6 +415,21 @@ button:disabled {
     
     .toast {
         min-width: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-brand h2 {
+        font-size: 1.2rem;
+    }
+
+    .nav-links {
+        gap: 0.5rem;
+    }
+
+    .nav-link {
+        font-size: 0.82rem;
+        padding: 0.3rem 0.45rem;
     }
 }
 

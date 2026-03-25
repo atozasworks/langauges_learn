@@ -6,6 +6,20 @@ use Dotenv\Dotenv;
 $dotenv = Dotenv::createImmutable(__DIR__);
 $dotenv->load();
 
+$env = static function (string $key, ?string $default = null): ?string {
+    if (array_key_exists($key, $_ENV) && $_ENV[$key] !== '') {
+        return (string) $_ENV[$key];
+    }
+    if (array_key_exists($key, $_SERVER) && $_SERVER[$key] !== '') {
+        return (string) $_SERVER[$key];
+    }
+    $value = getenv($key);
+    if ($value !== false && $value !== '') {
+        return (string) $value;
+    }
+    return $default;
+};
+
 // ....................Central configuration for authentication + mail.
 return [
     'app' => [
@@ -37,8 +51,8 @@ return [
     ],
 
     'google' => [
-        'client_id' => getenv('GOOGLE_CLIENT_ID'),
-        'client_secret' => getenv('GOOGLE_CLIENT_SECRET'),
+        'client_id' => $env('GOOGLE_CLIENT_ID'),
+        'client_secret' => $env('GOOGLE_CLIENT_SECRET'),
         // Google Console must include this exact URL in Authorized redirect URIs.
          //'redirect_uri' => 'https://www.ulsaapp.online/auth/google-callback.php',
          'redirect_uri' => 'http://localhost/spokenenglish/AtoZ_Services/lan_learn/auth/google-callback.php',
