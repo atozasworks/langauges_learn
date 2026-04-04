@@ -309,57 +309,75 @@ class DialoguePage {
             return;
         }
 
-        // Replace speaker names with learner names
-        const modifiedText = this.replaceAllBeforeColonWithLearners(this.originalDialogue, this.learnerNames);
-        
-        // Split into conversations
-        this.modifiedDialogue = this.splitIntoConversations(modifiedText);
+        // 1. Split raw text into conversations FIRST
+        const rawConversations = this.splitIntoConversations(this.originalDialogue);
+
+        // 2. Deck for no-repeat name assignment across conversations
+        let deck = [];
+        let lastUsed = null;
+        const learners = this.learnerNames;
+
+        const drawName = () => {
+            if (deck.length === 0) {
+                deck = this.shuffleArray([...learners]);
+                if (deck.length > 1 && deck[0] === lastUsed) {
+                    const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+                    [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+                }
+            }
+            const name = deck.shift();
+            lastUsed = name;
+            return name;
+        };
+
+        // 3. For each conversation, find unique roles and assign consistent names
+        this.modifiedDialogue = rawConversations.map(conv => {
+            // Find all unique speaker roles in this conversation (e.g. "Person 1", "Person 2")
+            const roleRegex = /^(.+?)\s*:(.*)$/gm;
+            const roles = new Map(); // role text → assigned learner name
+            let match;
+            while ((match = roleRegex.exec(conv)) !== null) {
+                const role = match[1].trim();
+                if (!roles.has(role)) {
+                    roles.set(role, drawName());
+                }
+            }
+
+            // Replace all lines, keeping same name for same role
+            return conv.replace(/^(.+?)\s*:(.*)$/gm, (full, beforeColon, afterColon) => {
+                const role = beforeColon.trim();
+                const assignedName = roles.get(role) || role;
+                return `<span class="learner-name"><strong>${assignedName}</strong></span>:<span class="conversation-text">${afterColon}</span>`;
+            });
+        });
     }
 
     replaceAllBeforeColonWithLearners(text, learners) {
+        // Kept for backward compatibility but no longer used by processDialogue
         if (!text || !Array.isArray(learners) || learners.length === 0) {
             return text;
         }
 
-        const shuffledNames = this.shuffleArray([...learners]);
-        const recentlyUsedNames = [];
-        const minDistance = Math.min(3, learners.length - 1);
+        let deck = [];
+        let lastUsed = null;
 
-        const getRandomName = () => {
-            return shuffledNames[Math.floor(Math.random() * shuffledNames.length)];
+        const drawName = () => {
+            if (deck.length === 0) {
+                deck = this.shuffleArray([...learners]);
+                if (deck.length > 1 && deck[0] === lastUsed) {
+                    const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+                    [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+                }
+            }
+            const name = deck.shift();
+            lastUsed = name;
+            return name;
         };
 
         return text.replace(
             /^(.+?)\s*:(.*)$/gm,
             (match, beforeColon, afterColon) => {
-                let assignedName = null;
-                let attempts = 0;
-                const maxAttempts = learners.length * 2;
-
-                // Try to find a name that hasn't been recently used
-                while (attempts < maxAttempts) {
-                    const candidate = getRandomName();
-                    attempts++;
-
-                    if (!recentlyUsedNames.includes(candidate)) {
-                        assignedName = candidate;
-                        break;
-                    }
-                }
-
-                // Fallback logic
-                if (!assignedName) {
-                    const fallbackPool = shuffledNames.filter(name => !recentlyUsedNames.includes(name));
-                    assignedName = fallbackPool.length > 0 ? 
-                        fallbackPool[Math.floor(Math.random() * fallbackPool.length)] : 
-                        getRandomName();
-                }
-
-                recentlyUsedNames.push(assignedName);
-                if (recentlyUsedNames.length > minDistance) {
-                    recentlyUsedNames.shift();
-                }
-
+                const assignedName = drawName();
                 return `<span class="learner-name"><strong>${assignedName}</strong></span>:<span class="conversation-text">${afterColon}</span>`;
             }
         );
