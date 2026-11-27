@@ -62,8 +62,76 @@
     otpRequestedForEmail = "";
   });
 
+  // ─── ATOZAS single sign-on: one login for every AtoZ app ───
+  // With it on, Google / email OTP / ATOZAS all log in at ATOZAS (atozasindia.in), and a visitor
+  // already signed in there is signed in here with no click (silent check, prompt=none).
+  const ATOZAS_OPTOUT_KEY = "atozas.optout.v1";
+  const ATOZAS_SILENT_KEY = "atozas.silentcheck.v1";
+  let atozasEnabled = false;
+
+  function startAtozasLogin(method, loginHint) {
+    try { localStorage.removeItem(ATOZAS_OPTOUT_KEY); } catch (_) {}
+    const params = new URLSearchParams({ method });
+    if (loginHint) params.set("login_hint", loginHint);
+    window.location.assign("./auth-backend/atozas-login.php?" + params.toString());
+  }
+
+  // Coming back from ATOZAS: the result is in the URL fragment.
+  (function takeAtozasResult() {
+    const hash = window.location.hash || "";
+    if (!/^#atozas_(user|error)=/.test(hash)) return;
+    const params = new URLSearchParams(hash.slice(1));
+    history.replaceState(null, document.title, window.location.pathname + window.location.search);
+    if (params.get("atozas_error")) {
+      formError.textContent = params.get("atozas_error");
+      return;
+    }
+    try {
+      const raw = params.get("atozas_user").replace(/-/g, "+").replace(/_/g, "/");
+      const bytes = Uint8Array.from(atob(raw), (ch) => ch.charCodeAt(0));
+      const user = JSON.parse(new TextDecoder().decode(bytes));
+      sessionStorage.setItem("loggedInUser", JSON.stringify({ name: user.name, email: user.email }));
+      showLoggedInState(user.name, user.email);
+      window.dispatchEvent(new CustomEvent("userLogin", { detail: { name: user.name, email: user.email } }));
+    } catch (_) {}
+  })();
+
+  fetch("./auth-backend/atozas-status.php", { headers: { Accept: "application/json" } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((cfg) => {
+      if (!cfg || !cfg.enabled) return;
+      atozasEnabled = true;
+      // "Continue with ATOZAS" next to the Google button.
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "method-card google-card";
+      btn.id = "atozasOption";
+      btn.textContent = "Continue with ATOZAS";
+      btn.addEventListener("click", () => startAtozasLogin("atozas"));
+      googleOption.insertAdjacentElement("afterend", btn);
+
+      // Silent check: once per tab, at most every 5 minutes across tabs, never after Logout here.
+      if (!cfg.silent || sessionStorage.getItem("loggedInUser") || window.self !== window.top) return;
+      try {
+        if (localStorage.getItem(ATOZAS_OPTOUT_KEY) === "1") return;
+        if (Number(sessionStorage.getItem(ATOZAS_SILENT_KEY) || 0) > 0) return;
+        if (Date.now() - Number(localStorage.getItem(ATOZAS_SILENT_KEY) || 0) < 5 * 60 * 1000) return;
+        if (/bot|crawl|spider|preview/i.test(navigator.userAgent || "")) return;
+        sessionStorage.setItem(ATOZAS_SILENT_KEY, String(Date.now()));
+        localStorage.setItem(ATOZAS_SILENT_KEY, String(Date.now()));
+      } catch (_) {
+        return;
+      }
+      window.location.replace("./auth-backend/atozas-login.php?silent=1");
+    })
+    .catch(() => {});
+
   // ─── Google button click ───
   googleOption.addEventListener("click", async () => {
+    if (atozasEnabled) {
+      startAtozasLogin("google");
+      return;
+    }
     setLoginMode("google");
     // Disable name field — Google provides the name automatically
     if (loginNameInput) {
@@ -83,6 +151,11 @@
     const email = otpEmail.value.trim();
     if (!email) {
       formError.textContent = "Enter your Gmail before requesting OTP.";
+      return;
+    }
+    if (atozasEnabled) {
+      // The code is sent and checked by ATOZAS (one login for every AtoZ app).
+      startAtozasLogin("otp", email.toLowerCase());
       return;
     }
 
@@ -147,6 +220,8 @@
   logoutYesBtn?.addEventListener("click", () => {
     Utils.hidePopup('logout-popup');
     sessionStorage.removeItem("loggedInUser");
+    // Stay signed out here (all tabs) even while signed in at ATOZAS, until a login button.
+    try { localStorage.setItem("atozas.optout.v1", "1"); } catch (_) {}
     showLoggedOutState();
     // Notify other modules (e.g. LearnHome) about logout
     window.dispatchEvent(new CustomEvent('userLogout'));
